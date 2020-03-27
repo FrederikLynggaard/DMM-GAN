@@ -78,7 +78,6 @@ def get_imgs(img_path, imsize, bbox=None,
         ret = [normalize(img)]
     else:
         for i in range(cfg.TREE.BRANCH_NUM):
-            # print(imsize[i])
             if i < (cfg.TREE.BRANCH_NUM - 1):
                 re_img = transforms.Scale(imsize[i])(img)
             else:
@@ -133,7 +132,7 @@ class TextDataset(data.Dataset):
         #
         filename_bbox = {img_file[:-4]: [] for img_file in filenames}
         numImgs = len(filenames)
-        for i in xrange(0, numImgs):
+        for i in range(0, numImgs):
             # bbox = [x-left, y-top, width, height]
             bbox = df_bounding_boxes.iloc[i][1:].tolist()
 
@@ -147,7 +146,7 @@ class TextDataset(data.Dataset):
         for i in range(len(filenames)):
             cap_path = '%s/text/%s.txt' % (data_dir, filenames[i])
             with open(cap_path, "r") as f:
-                captions = f.read().decode('utf8').split('\n')
+                captions = f.read().split('\n')
                 cnt = 0
                 for cap in captions:
                     if len(cap) == 0:
@@ -251,7 +250,7 @@ class TextDataset(data.Dataset):
     def load_class_id(self, data_dir, total_num):
         if os.path.isfile(data_dir + '/class_info.pickle'):
             with open(data_dir + '/class_info.pickle', 'rb') as f:
-                class_id = pickle.load(f)
+                class_id = pickle.load(f, encoding="bytes")
         else:
             class_id = np.arange(total_num)
         return class_id
@@ -269,21 +268,22 @@ class TextDataset(data.Dataset):
     def get_caption(self, sent_ix):
         # a list of indices for a sentence
         sent_caption = np.asarray(self.captions[sent_ix]).astype('int64')
-        # if (sent_caption == 0).sum() > 0:
-        #     print('ERROR: do not need END (0) token', sent_caption)
-        num_words = len(sent_caption)
-        # pad with 0s (i.e., '<end>')
-        x = np.zeros((cfg.TEXT.WORDS_NUM, 1), dtype='int64')
-        x_len = num_words
-        if num_words <= cfg.TEXT.WORDS_NUM:
-            x[:num_words, 0] = sent_caption
+
+        num_words = len(sent_caption) - 2
+        # pad with 2s (i.e., '<pad>')
+        x = np.ones((cfg.TEXT.WORDS_NUM, 1), dtype='int64') * 2
+        x_len = num_words + 2
+        if num_words <= cfg.TEXT.WORDS_NUM - 2:
+            x[:x_len, 0] = sent_caption
         else:
-            ix = list(np.arange(num_words))  # 1, 2, 3,..., maxNum
+            ix = list(np.arange(1, num_words + 1))  # 1, 2, 3,...
             np.random.shuffle(ix)
-            ix = ix[:cfg.TEXT.WORDS_NUM]
+            ix = ix[:cfg.TEXT.WORDS_NUM - 2]
             ix = np.sort(ix)
-            x[:, 0] = sent_caption[ix]
+            x[1:-1, 0] = sent_caption[ix]
             x_len = cfg.TEXT.WORDS_NUM
+            x[0] = 0  # <start>
+            x[-1] = 1  # <end>
         return x, x_len
 
     def __getitem__(self, index):

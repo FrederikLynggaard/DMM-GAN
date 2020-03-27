@@ -1,3 +1,5 @@
+backup
+output
 *.pyc
 miscc/*.pyc
 .DS_Store
