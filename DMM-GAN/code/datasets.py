@@ -78,7 +78,6 @@ def get_imgs(img_path, imsize, bbox=None,
         ret = [normalize(img)]
     else:
         for i in range(cfg.TREE.BRANCH_NUM):
-            # print(imsize[i])
             if i < (cfg.TREE.BRANCH_NUM - 1):
                 re_img = transforms.Scale(imsize[i])(img)
             else:
@@ -147,7 +146,7 @@ class TextDataset(data.Dataset):
         for i in range(len(filenames)):
             cap_path = '%s/text/%s.txt' % (data_dir, filenames[i])
             with open(cap_path, "r") as f:
-                captions = f.read().decode('utf8').split('\n')
+                captions = f.read().split('\n')
                 cnt = 0
                 for cap in captions:
                     if len(cap) == 0:
@@ -217,7 +216,7 @@ class TextDataset(data.Dataset):
                 ixtoword, wordtoix, len(ixtoword)]
 
     def load_text_data(self, data_dir, split):
-        filepath = os.path.join(data_dir, 'captions.pickle')
+        filepath = os.path.join(data_dir, 'bird_captions.pickle')
         train_names = self.load_filenames(data_dir, 'train')
         test_names = self.load_filenames(data_dir, 'test')
         if not os.path.isfile(filepath):
@@ -269,21 +268,22 @@ class TextDataset(data.Dataset):
     def get_caption(self, sent_ix):
         # a list of indices for a sentence
         sent_caption = np.asarray(self.captions[sent_ix]).astype('int64')
-        if (sent_caption == 0).sum() > 0:
-            print('ERROR: do not need END (0) token', sent_caption)
-        num_words = len(sent_caption)
-        # pad with 0s (i.e., '<end>')
-        x = np.zeros((cfg.TEXT.WORDS_NUM, 1), dtype='int64')
-        x_len = num_words
-        if num_words <= cfg.TEXT.WORDS_NUM:
-            x[:num_words, 0] = sent_caption
+
+        num_words = len(sent_caption) - 2
+        # pad with 2s (i.e., '<pad>')
+        x = np.ones((cfg.TEXT.WORDS_NUM, 1), dtype='int64') * 2
+        x_len = num_words + 2
+        if num_words <= cfg.TEXT.WORDS_NUM - 2:
+            x[:x_len, 0] = sent_caption
         else:
-            ix = list(np.arange(num_words))  # 1, 2, 3,..., maxNum
+            ix = list(np.arange(1, num_words + 1))  # 1, 2, 3,...
             np.random.shuffle(ix)
-            ix = ix[:cfg.TEXT.WORDS_NUM]
+            ix = ix[:cfg.TEXT.WORDS_NUM - 2]
             ix = np.sort(ix)
-            x[:, 0] = sent_caption[ix]
+            x[1:-1, 0] = sent_caption[ix]
             x_len = cfg.TEXT.WORDS_NUM
+            x[0] = 0  # <start>
+            x[-1] = 1  # <end>
         return x, x_len
 
     def __getitem__(self, index):
@@ -307,27 +307,6 @@ class TextDataset(data.Dataset):
         caps, cap_len = self.get_caption(new_sent_ix)
         return imgs, caps, cap_len, cls_id, key
 
-    def get_mis_caption(self, cls_id):
-        mis_match_captions_t = []
-        mis_match_captions = torch.zeros(99, cfg.TEXT.WORDS_NUM)
-        mis_match_captions_len = torch.zeros(99)
-        i = 0
-        while len(mis_match_captions_t) < 99:
-            idx = random.randint(0, self.number_example)
-            if cls_id == self.class_id[idx]:
-                continue
-            sent_ix = random.randint(0, self.embeddings_num)
-            new_sent_ix = idx * self.embeddings_num + sent_ix
-            caps_t, cap_len_t = self.get_caption(new_sent_ix)
-            mis_match_captions_t.append(torch.from_numpy(caps_t).squeeze())
-            mis_match_captions_len[i] = cap_len_t
-            i = i +1
-        sorted_cap_lens, sorted_cap_indices = torch.sort(mis_match_captions_len, 0, True)
-        #import ipdb
-        #ipdb.set_trace()
-        for i in range(99):
-            mis_match_captions[i,:] = mis_match_captions_t[sorted_cap_indices[i]]
-        return mis_match_captions.type(torch.LongTensor).cuda(), sorted_cap_lens.type(torch.LongTensor).cuda()
 
     def __len__(self):
         return len(self.filenames)

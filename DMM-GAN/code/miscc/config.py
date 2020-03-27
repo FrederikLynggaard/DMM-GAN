@@ -16,7 +16,7 @@ __C.DATA_DIR = ''
 __C.GPU_ID = 0
 __C.CUDA = True
 __C.WORKERS = 6
-
+__C.OUTPUT_PATH = ''
 __C.RNN_TYPE = 'LSTM'   # 'GRU'
 __C.B_VALIDATION = False
 
@@ -43,7 +43,18 @@ __C.TRAIN.SMOOTH = edict()
 __C.TRAIN.SMOOTH.GAMMA1 = 5.0
 __C.TRAIN.SMOOTH.GAMMA3 = 10.0
 __C.TRAIN.SMOOTH.GAMMA2 = 5.0
-__C.TRAIN.SMOOTH.LAMBDA = 1.0
+__C.TRAIN.SMOOTH.LAMBDA = 0.0
+__C.TRAIN.SMOOTH.LAMBDA1 = 1.0
+
+
+# Caption_model_settings added by tingting
+__C.CAP = edict()
+__C.CAP.embed_size = 256
+__C.CAP.hidden_size = 512
+__C.CAP.num_layers = 1
+__C.CAP.learning_rate = 0.001
+__C.CAP.caption_cnn_path = ''
+__C.CAP.caption_rnn_path = ''
 
 
 # Modal options
@@ -60,7 +71,7 @@ __C.GAN.B_DCGAN = False
 __C.TEXT = edict()
 __C.TEXT.CAPTIONS_PER_IMAGE = 10
 __C.TEXT.EMBEDDING_DIM = 256
-__C.TEXT.WORDS_NUM = 18
+__C.TEXT.WORDS_NUM = 20
 
 
 def _merge_a_into_b(a, b):

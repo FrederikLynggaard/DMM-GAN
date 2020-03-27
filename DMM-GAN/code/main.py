@@ -2,7 +2,7 @@ from __future__ import print_function
 
 from miscc.config import cfg, cfg_from_file
 from datasets import TextDataset
-from trainer import condGANTrainer as trainer
+from trainer import Trainer as trainer
 
 import os
 import sys
@@ -25,10 +25,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a AttnGAN network')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
-                        default='cfg/bird_DMGAN.yml', type=str)
+                        default='cfg/bird_attn2.yml', type=str)
     parser.add_argument('--gpu', dest='gpu_id', type=int, default=-1)
     parser.add_argument('--data_dir', dest='data_dir', type=str, default='')
-    parser.add_argument('--NET_G', type=str, default='')
     parser.add_argument('--manualSeed', type=int, help='manual seed')
     args = parser.parse_args()
     return args
@@ -89,14 +88,6 @@ if __name__ == "__main__":
     if args.cfg_file is not None:
         cfg_from_file(args.cfg_file)
 
-    if args.gpu_id != -1:
-        cfg.GPU_ID = args.gpu_id
-    else:
-        cfg.CUDA = False
-
-    if args.NET_G != '':
-        cfg.TRAIN.NET_G = args.NET_G
-
     if args.data_dir != '':
         cfg.DATA_DIR = args.data_dir
     print('Using config:')
@@ -111,15 +102,11 @@ if __name__ == "__main__":
     torch.manual_seed(args.manualSeed)
     if cfg.CUDA:
         torch.cuda.manual_seed_all(args.manualSeed)
-    torch.cuda.set_device(cfg.GPU_ID)
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
-    print("Seed: %d" % (args.manualSeed))
 
     now = datetime.datetime.now(dateutil.tz.tzlocal())
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
-    output_dir = '../output/%s_%s_%s' % \
-        (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
+    output_dir = '%s/output/%s_%s_%s' % \
+        (cfg.OUTPUT_PATH, cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
 
     split_dir, bshuffle = 'train', True
     if not cfg.TRAIN.FLAG:
@@ -141,7 +128,7 @@ if __name__ == "__main__":
         drop_last=True, shuffle=bshuffle, num_workers=int(cfg.WORKERS))
 
     # Define models and go to train/evaluate
-    algo = trainer(output_dir, dataloader, dataset.n_words, dataset.ixtoword, dataset)
+    algo = trainer(output_dir, dataloader, dataset.n_words, dataset.ixtoword)
 
     start_t = time.time()
     if cfg.TRAIN.FLAG:
