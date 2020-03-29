@@ -19,7 +19,6 @@ import time
 import numpy as np
 
 
-# MirrorGAN
 class Trainer(object):
     def __init__(self, output_dir, data_loader, n_words, ixtoword):
         if cfg.TRAIN.FLAG:
@@ -67,19 +66,23 @@ class Trainer(object):
         print('Load text encoder from:', cfg.TRAIN.NET_E)
         text_encoder.eval()
 
-        # Caption models - cnn_encoder and rnn_decoder
-        caption_cnn = CAPTION_CNN(cfg.CAP.embed_size)
-        caption_cnn.load_state_dict(torch.load(cfg.CAP.caption_cnn_path, map_location=lambda storage, loc: storage))
-        for p in caption_cnn.parameters():
-            p.requires_grad = False
-        print('Load caption model from:', cfg.CAP.caption_cnn_path)
-        caption_cnn.eval()
+        if cfg.TRAIN.INCLUDE_STREAM:
+            # Caption models - cnn_encoder and rnn_decoder
+            caption_cnn = CAPTION_CNN(cfg.CAP.embed_size)
+            caption_cnn.load_state_dict(torch.load(cfg.CAP.caption_cnn_path, map_location=lambda storage, loc: storage))
+            for p in caption_cnn.parameters():
+                p.requires_grad = False
+            print('Load caption model from:', cfg.CAP.caption_cnn_path)
+            caption_cnn.eval()
 
-        caption_rnn = CAPTION_RNN(cfg.CAP.embed_size, cfg.CAP.hidden_size * 2, self.n_words, cfg.CAP.num_layers)
-        caption_rnn.load_state_dict(torch.load(cfg.CAP.caption_rnn_path, map_location=lambda storage, loc: storage))
-        for p in caption_rnn.parameters():
-            p.requires_grad = False
-        print('Load caption model from:', cfg.CAP.caption_rnn_path)
+            caption_rnn = CAPTION_RNN(cfg.CAP.embed_size, cfg.CAP.hidden_size * 2, self.n_words, cfg.CAP.num_layers)
+            caption_rnn.load_state_dict(torch.load(cfg.CAP.caption_rnn_path, map_location=lambda storage, loc: storage))
+            for p in caption_rnn.parameters():
+                p.requires_grad = False
+            print('Load caption model from:', cfg.CAP.caption_rnn_path)
+        else:
+            caption_cnn = None
+            caption_rnn = None
 
         # Generator and Discriminator:
         netsD = []
@@ -132,8 +135,9 @@ class Trainer(object):
         if cfg.CUDA:
             text_encoder = text_encoder.cuda()
             image_encoder = image_encoder.cuda()
-            caption_cnn = caption_cnn.cuda()
-            caption_rnn = caption_rnn.cuda()
+            if cfg.TRAIN.INCLUDE_STREAM:
+                caption_cnn = caption_cnn.cuda()
+                caption_rnn = caption_rnn.cuda()
             netG.cuda()
             for i in range(len(netsD)):
                 netsD[i].cuda()
@@ -143,7 +147,7 @@ class Trainer(object):
         optimizersD = []
         num_Ds = len(netsD)
         for i in range(num_Ds):
-            opt = optim.Adam(netsD[i].parameters(),
+            opt = optim.Adam(filter(lambda p: p.requires_grad, netsD[i].parameters()),
                              lr=cfg.TRAIN.DISCRIMINATOR_LR,
                              betas=(0.5, 0.999))
             optimizersD.append(opt)

@@ -169,6 +169,7 @@ def generator_loss(netsD, image_encoder, caption_cnn, caption_rnn, captions, fak
                    words_embs, sent_emb, match_labels,
                    cap_lens, class_ids):
     numDs = len(netsD)
+    batch_size = real_labels.size(0)
     logs = ''
     # Forward
     errG_total = 0
@@ -189,14 +190,34 @@ def generator_loss(netsD, image_encoder, caption_cnn, caption_rnn, captions, fak
         logs += 'g_loss%d: %.2f ' % (i, g_loss.data.item())
 
         if i == (numDs - 1):
-            fakeimg_feature = caption_cnn(fake_imgs[i])
-            captions.cuda()
-            target_cap = pack_padded_sequence(captions, cap_lens.data.tolist(), batch_first=True)[0].cuda()
-            cap_output = caption_rnn(fakeimg_feature, captions, cap_lens)
-            cap_loss = caption_loss(cap_output, target_cap) * cfg.TRAIN.SMOOTH.LAMBDA1
+            if cfg.TRAIN.INCLUDE_STREAM:
+                fakeimg_feature = caption_cnn(fake_imgs[i])
+                captions.cuda()
+                target_cap = pack_padded_sequence(captions, cap_lens.data.tolist(), batch_first=True)[0].cuda()
+                cap_output = caption_rnn(fakeimg_feature, captions, cap_lens)
+                cap_loss = caption_loss(cap_output, target_cap) * cfg.TRAIN.SMOOTH.LAMBDA_STREAM
 
-            errG_total += cap_loss
-            logs += 'cap_loss: %.2f, ' % cap_loss
+                errG_total += cap_loss
+                logs += 'cap_loss: %.2f, ' % cap_loss
+
+            if cfg.TRAIN.INCLUDE_DAMSM:
+                # words_features: batch_size x nef x 17 x 17
+                # sent_code: batch_size x nef
+                region_features, cnn_code = image_encoder(fake_imgs[i])
+                w_loss0, w_loss1, _ = words_loss(region_features, words_embs,
+                                                 match_labels, cap_lens,
+                                                 class_ids, batch_size)
+                w_loss = (w_loss0 + w_loss1) * cfg.TRAIN.SMOOTH.LAMBDA_DAMSM
+                # err_words = err_words + w_loss.data[0]
+
+                s_loss0, s_loss1 = sent_loss(cnn_code, sent_emb,
+                                             match_labels, class_ids, batch_size)
+                s_loss = (s_loss0 + s_loss1) * cfg.TRAIN.SMOOTH.LAMBDA_DAMSM
+                # err_sent = err_sent + s_loss.data[0]
+
+                errG_total += w_loss + s_loss
+                logs += 'w_loss: %.2f s_loss: %.2f ' % (w_loss.item(), s_loss.item())
+
     return errG_total, logs
 
 

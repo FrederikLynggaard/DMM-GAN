@@ -18,13 +18,16 @@ TRAIN:
     DISCRIMINATOR_LR: 0.0002
     GENERATOR_LR: 0.0002
 
+    INCLUDE_STREAM: True
+    INCLUDE_DAMSM: False
+
     NET_E: '../DAMSMencoders/text_encoder600.pth'
     SMOOTH:
         GAMMA1: 4.0  # 1,2,5 good 4 best  10&100bad
         GAMMA2: 5.0
         GAMMA3: 10.0  # 10good 1&100bad
-        LAMBDA: 0.0
-        LAMBDA1: 10.0 # TODO: Align hyperparameter naming and values
+        LAMBDA_STREAM: 10.0
+        LAMBDA_DAMSM: 5.0
 
 CAP: # TODO: All caps
     embed_size: 256
