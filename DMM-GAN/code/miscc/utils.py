@@ -75,7 +75,7 @@ def build_super_images(real_imgs, captions, ixtoword,
 
 
     real_imgs = \
-        nn.Upsample(size=(vis_size, vis_size), mode='bilinear')(real_imgs)
+        nn.Upsample(size=(vis_size, vis_size), mode='bilinear', align_corners=True)(real_imgs)
     # [-1, 1] --> [0, 1]
     real_imgs.add_(1).div_(2).mul_(255)
     real_imgs = real_imgs.data.numpy()
@@ -86,7 +86,7 @@ def build_super_images(real_imgs, captions, ixtoword,
     post_pad = np.zeros([pad_sze[1], pad_sze[2], 3])
     if lr_imgs is not None:
         lr_imgs = \
-            nn.Upsample(size=(vis_size, vis_size), mode='bilinear')(lr_imgs)
+            nn.Upsample(size=(vis_size, vis_size), mode='bilinear', align_corners=True)(lr_imgs)
         # [-1, 1] --> [0, 1]
         lr_imgs.add_(1).div_(2).mul_(255)
         lr_imgs = lr_imgs.data.numpy()
@@ -285,12 +285,15 @@ def build_super_images2(real_imgs, captions, cap_lens, ixtoword,
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
-        nn.init.orthogonal(m.weight.data, 1.0)
+        if 'weight' in m.state_dict().keys():
+            nn.init.orthogonal_(m.weight.data, 1.0)
+        elif 'weight_bar' in m.state_dict().keys():
+            nn.init.orthogonal_(m.weight_bar.data, 1.0)
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
     elif classname.find('Linear') != -1:
-        nn.init.orthogonal(m.weight.data, 1.0)
+        nn.init.orthogonal_(m.weight.data, 1.0)
         if m.bias is not None:
             m.bias.data.fill_(0.0)
 

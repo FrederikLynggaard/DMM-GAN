@@ -12,7 +12,7 @@ TRAIN:
     FLAG: True
     NET_G: ''
     B_NET_D: True
-    BATCH_SIZE: 10  # 22
+    BATCH_SIZE: 8  # 22
     MAX_EPOCH: 650
     SNAPSHOT_INTERVAL: 25
     DISCRIMINATOR_LR: 0.0002
@@ -34,9 +34,9 @@ CAP: # TODO: All caps
     caption_cnn_path: '../STREAM/encoder-1000.ckpt'
     caption_rnn_path: '../STREAM/decoder-1000.ckpt'
 
-GAN: # TODO: Align DF_DIM and GF_DIM
-    DF_DIM: 64
-    GF_DIM: 32
+GAN:
+    DF_DIM: 32
+    GF_DIM: 64
     Z_DIM: 100
     R_NUM: 2
 

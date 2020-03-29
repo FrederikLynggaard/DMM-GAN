@@ -49,11 +49,11 @@ def func_attention(query, context, gamma1):
 
 
 class GLAttentionGeneral(nn.Module):
-    def __init__(self, idf, cdf):
+    def __init__(self, idf, cdf, ncf):
         super(GLAttentionGeneral, self).__init__()
         self.conv_context = conv1x1(cdf, idf)
         self.conv_sentence_vis = conv1x1(idf, idf)
-        self.linear = nn.Linear(100, idf)
+        self.linear = nn.Linear(ncf, idf)
         self.sm = nn.Softmax()
         self.mask = None
 

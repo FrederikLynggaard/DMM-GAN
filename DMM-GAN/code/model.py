@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from miscc.config import cfg
 from GLAttention import GLAttentionGeneral as ATT_NET
+from spectral import SpectralNorm
 
 
 class GLU(nn.Module):
@@ -23,15 +24,13 @@ class GLU(nn.Module):
 
 def conv1x1(in_planes, out_planes, bias=False):
     "1x1 convolution with padding"
-    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1,
-                     padding=0, bias=bias)
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, bias=bias)
 
-def conv3x3(in_planes, out_planes):
+def conv3x3(in_planes, out_planes, bias=False):
     "3x3 convolution with padding"
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1,
-                     padding=1, bias=False)
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1, bias=bias)
 
-# Upsale the spatial size by a factor of 2
+# Upscale the spatial size by a factor of 2
 def upBlock(in_planes, out_planes):
     block = nn.Sequential(
         nn.Upsample(scale_factor=2, mode='nearest'),
@@ -117,13 +116,10 @@ class RNN_ENCODER(nn.Module):
     def init_hidden(self, bsz):
         weight = next(self.parameters()).data
         if self.rnn_type == 'LSTM':
-            return (Variable(weight.new(self.nlayers * self.num_directions,
-                                        bsz, self.nhidden).zero_()),
-                    Variable(weight.new(self.nlayers * self.num_directions,
-                                        bsz, self.nhidden).zero_()))
+            return (Variable(weight.new(self.nlayers * self.num_directions, bsz, self.nhidden).zero_()),
+                    Variable(weight.new(self.nlayers * self.num_directions, bsz, self.nhidden).zero_()))
         else:
-            return Variable(weight.new(self.nlayers * self.num_directions,
-                                       bsz, self.nhidden).zero_())
+            return Variable(weight.new(self.nlayers * self.num_directions, bsz, self.nhidden).zero_())
 
     def forward(self, captions, cap_lens, hidden, mask=None):
         # input: torch.LongTensor of size batch x n_steps
@@ -202,7 +198,7 @@ class CNN_ENCODER(nn.Module):
     def forward(self, x):
         features = None
         # --> fixed-size input: batch x 3 x 299 x 299
-        x = nn.Upsample(size=(299, 299), mode='bilinear')(x)
+        x = nn.Upsample(size=(299, 299), mode='bilinear', align_corners=True)(x) # TODO: why align_corners T/F?
         # 299 x 299 x 3
         x = self.Conv2d_1a_3x3(x)
         # 149 x 149 x 32
@@ -259,6 +255,33 @@ class CNN_ENCODER(nn.Module):
         # 512
         if features is not None:
             features = self.emb_features(features)
+        return features, cnn_code
+
+
+class CNN_ENCODER_MOCK(nn.Module):
+    def __init__(self, nef):
+        super(CNN_ENCODER_MOCK, self).__init__()
+        if cfg.TRAIN.FLAG:
+            self.nef = nef
+        else:
+            self.nef = 256  # define a uniform ranker
+
+        self.linear_mock = nn.Linear(268203, 32)
+
+        self.emb_features = nn.Linear(32, 289 * self.nef)
+        self.emb_cnn_code = nn.Linear(32, self.nef)
+
+
+    def forward(self, x):
+        # --> fixed-size input: batch x 3 x 299 x 299
+        x = x.view(x.size(0), -1)
+        x = self.linear_mock(x)
+
+        cnn_code = self.emb_cnn_code(x)
+
+        features = self.emb_features(x)
+        features = features.view(x.size(0), -1, 17, 17)
+
         return features, cnn_code
 
 
@@ -335,99 +358,132 @@ class INIT_STAGE_G(nn.Module):
 
         return out_code64
 
-# class NEXT_STAGE_G(nn.Module):
-#     def __init__(self, ngf, nef, ncf):
-#         super(NEXT_STAGE_G, self).__init__()
-#         self.gf_dim = ngf
-#         self.ef_dim = nef
-#         self.cf_dim = ncf
-#         self.num_residual = cfg.GAN.R_NUM
-#         self.define_module()
-#
-#     def _make_layer(self, block, channel_num):
-#         layers = []
-#         for i in range(cfg.GAN.R_NUM):
-#             layers.append(block(channel_num))
-#         return nn.Sequential(*layers)
-#
-#     def define_module(self):
-#         ngf = self.gf_dim
-#         self.att = ATT_NET(ngf, self.ef_dim)
-#         self.residual = self._make_layer(ResBlock, ngf * 2)
-#         self.upsample = upBlock(ngf * 2, ngf)
-#
-#     def forward(self, h_code, c_code, word_embs, mask):
-#         """
-#             h_code1(query):  batch x idf x ih x iw (queryL=ihxiw)
-#             word_embs(context): batch x cdf x sourceL (sourceL=seq_len)
-#             c_code1: batch x idf x queryL
-#             att1: batch x sourceL x queryL
-#         """
-#         self.att.applyMask(mask)
-#         c_code, att = self.att(h_code, word_embs)
-#         h_c_code = torch.cat((h_code, c_code), 1)
-#         print('h_c_code:', h_c_code.size()) \
-#             ('h_c_code:', (16, 64, 64, 64))
-#             ('h_c_code:', (16, 64, 128, 128))
-#         out_code = self.residual(h_c_code)
-#
-#         # state size ngf/2 x 2in_size x 2in_size
-#         out_code = self.upsample(out_code)
-#
-#         return out_code, att
+
+class Memory(nn.Module):
+    def __init__(self):
+        super(Memory, self).__init__()
+        self.sm = nn.Softmax()
+        self.mask = None
+
+    def applyMask(self, mask):
+        self.mask = mask  # batch x sourceL
+
+    def forward(self, input, context_key, content_value):#
+        """
+            input: batch x idf x ih x iw (queryL=ihxiw)
+            context: batch x idf x sourceL
+        """
+        ih, iw = input.size(2), input.size(3)
+        queryL = ih * iw
+        batch_size, sourceL = context_key.size(0), context_key.size(2)
+
+        # --> batch x queryL x idf
+        target = input.view(batch_size, -1, queryL)
+        targetT = torch.transpose(target, 1, 2).contiguous()
+        sourceT = context_key
+
+        # Get weight
+        # (batch x queryL x idf)(batch x idf x sourceL)-->batch x queryL x sourceL
+        weight = torch.bmm(targetT, sourceT)
+
+        # --> batch*queryL x sourceL
+        weight = weight.view(batch_size * queryL, sourceL)
+        if self.mask is not None:
+            # batch_size x sourceL --> batch_size*queryL x sourceL
+            mask = self.mask.repeat(queryL, 1)
+            weight.data.masked_fill_(mask.data, -float('inf'))
+        weight = torch.nn.functional.softmax(weight, dim=1)
+
+        # --> batch x queryL x sourceL
+        weight = weight.view(batch_size, queryL, sourceL)
+        # --> batch x sourceL x queryL
+        weight = torch.transpose(weight, 1, 2).contiguous()
+
+        # (batch x idf x sourceL)(batch x sourceL x queryL) --> batch x idf x queryL
+        weightedContext = torch.bmm(content_value, weight)  #
+        weightedContext = weightedContext.view(batch_size, -1, ih, iw)
+        weight = weight.view(batch_size, -1, ih, iw)
+
+        return weightedContext, weight
 
 
 class NEXT_STAGE_G(nn.Module):
-    def __init__(self, ngf, nef, ncf):
+    def __init__(self, ngf, nef, ncf, size):
         super(NEXT_STAGE_G, self).__init__()
         self.gf_dim = ngf
         self.ef_dim = nef
         self.cf_dim = ncf
-        # print(ngf, nef, ncf)  (32, 256, 100)
-        # (32, 256, 100)
         self.num_residual = cfg.GAN.R_NUM
+        self.size = size
         self.define_module()
         self.conv = conv1x1(ngf * 3, ngf * 2)
 
     def _make_layer(self, block, channel_num):
         layers = []
-        for i in range(cfg.GAN.R_NUM): # 2
+        for i in range(cfg.GAN.R_NUM):
             layers.append(block(channel_num))
         return nn.Sequential(*layers)
 
     def define_module(self):
         ngf = self.gf_dim
-        self.att = ATT_NET(ngf, self.ef_dim)
+        self.avg = nn.AvgPool2d(kernel_size=self.size)
+        self.A = nn.Linear(self.ef_dim, 1, bias=False)
+        self.B = nn.Linear(self.gf_dim, 1, bias=False)
+        self.sigmoid = nn.Sigmoid()
+        self.M_r = nn.Sequential(
+            nn.Conv1d(ngf, ngf * 2, kernel_size=1, stride=1, padding=0),
+            nn.ReLU()
+        )
+        self.M_w = nn.Sequential(
+            nn.Conv1d(self.ef_dim, ngf * 2, kernel_size=1, stride=1, padding=0),
+            nn.ReLU()
+        )
+        self.key = nn.Sequential(
+            nn.Conv1d(ngf*2, ngf, kernel_size=1, stride=1, padding=0),
+            nn.ReLU()
+        )
+        self.value = nn.Sequential(
+            nn.Conv1d(ngf*2, ngf, kernel_size=1, stride=1, padding=0),
+            nn.ReLU()
+        )
+        self.memory_operation = Memory()
+        self.response_gate = nn.Sequential(
+            nn.Conv2d(self.gf_dim * 2, 1, kernel_size=1, stride=1, padding=0),
+            nn.Sigmoid()
+        )
         self.residual = self._make_layer(ResBlock, ngf * 2)
         self.upsample = upBlock(ngf * 2, ngf)
 
     def forward(self, h_code, c_code, word_embs, mask):
         """
-            h_code1(query):  batch x idf x ih x iw (queryL=ihxiw)
-            word_embs(context): batch x cdf x sourceL (sourceL=seq_len)
-            c_code1: batch x idf x queryL
+            h_code(image features):  batch x idf x ih x iw (queryL=ihxiw)
+            word_embs(word features): batch x cdf x sourceL (sourceL=seq_len)
+            c_code: batch x idf x queryL
             att1: batch x sourceL x queryL
         """
-        # print('========')
-        # ((16, 32, 64, 64), (16, 100), (16, 256, 18), (16, 18))
-        # print(h_code.size(), c_code.size(), word_embs.size(), mask.size())
-        self.att.applyMask(mask)
-        # here, a new c_code is generated by self.att() method.
-        # weightedContext, weightedSentence, word_attn, sent_vs_att
-        c_code, weightedSentence, att, sent_att = self.att(h_code, c_code, word_embs)
-        # Then, image feature are concated with a new c_code, they become h_c_code,
-        # so, here I can make some change, to concate more items together.
-        # which means I need to get more output from line 369, self.att()
-        # also, I need to feed more information to calculate the function, and let's see what the new idea will return.
-        h_c_code = torch.cat((h_code, c_code), 1)
-        # print('h_c_code.size:', h_c_code.size())  # ('h_c_code.size:', (16, 64, 64, 64))
-        h_c_sent_code = torch.cat((h_c_code, weightedSentence), 1)
-        # print('h_c_sent_code.size:', h_c_sent_code.size())
-        # ('h_c_code.size:', (16, 64, 64, 64))
-        # ('h_c_sent_code.size:', (16, 96, 64, 64))
-        h_c_sent_code = self.conv(h_c_sent_code)
-        out_code = self.residual(h_c_sent_code)
-        # print('out_code:', out_code.size())
+        # Memory Writing
+        word_embs_T = torch.transpose(word_embs, 1, 2).contiguous()
+        h_code_avg = self.avg(h_code).detach()
+        h_code_avg = h_code_avg.squeeze(3)
+        h_code_avg_T = torch.transpose(h_code_avg, 1, 2).contiguous()
+        gate1 = torch.transpose(self.A(word_embs_T), 1, 2).contiguous()
+        gate2 = self.B(h_code_avg_T).repeat(1, 1, word_embs.size(2))
+        writing_gate = torch.sigmoid(gate1 + gate2)
+        h_code_avg = h_code_avg.repeat(1, 1, word_embs.size(2))
+        memory = self.M_w(word_embs) * writing_gate + self.M_r(h_code_avg) * (1 - writing_gate)
+
+        # Key Addressing and Value Reading
+        key = self.key(memory)
+        value = self.value(memory)
+        self.memory_operation.applyMask(mask)
+        memory_out, att = self.memory_operation(h_code, key, value)
+
+        # Key Response
+        response_gate = self.response_gate(torch.cat((h_code, memory_out), 1))
+        h_code_new = h_code * (1 - response_gate) + response_gate * memory_out
+        h_code_new = torch.cat((h_code_new, h_code_new), 1)
+
+        out_code = self.residual(h_code_new)
         # state size ngf/2 x 2in_size x 2in_size
         out_code = self.upsample(out_code)
         return out_code, att
@@ -446,7 +502,7 @@ class GET_IMAGE_G(nn.Module):
         out_img = self.img(h_code)
         return out_img
 
-#G_NET used in the paper
+
 class G_NET(nn.Module):
     def __init__(self):
         super(G_NET, self).__init__()
@@ -460,12 +516,12 @@ class G_NET(nn.Module):
             self.img_net1 = GET_IMAGE_G(ngf)
         # gf x 64 x 64
         if cfg.TREE.BRANCH_NUM > 1:
-            self.h_net2 = NEXT_STAGE_G(ngf, nef, ncf)
+            self.h_net2 = NEXT_STAGE_G(ngf, nef, ncf, 64)
             self.img_net2 = GET_IMAGE_G(ngf)
         if cfg.TREE.BRANCH_NUM > 2:
-            self.h_net3 = NEXT_STAGE_G(ngf, nef, ncf)
+            self.h_net3 = NEXT_STAGE_G(ngf, nef, ncf, 128)
             self.img_net3 = GET_IMAGE_G(ngf)
-    # netG(noise, sent_emb, words_embs, mask)
+
     def forward(self, z_code, sent_emb, word_embs, mask):
         """
             :param z_code: batch x cfg.GAN.Z_DIM
@@ -476,33 +532,26 @@ class G_NET(nn.Module):
         """
         fake_imgs = []
         att_maps = []
-        '''this is the Conditioning Augmentation'''
-        # print('sent_emb:', sent_emb.size())  #('sent_emb:', (16, 256))
         c_code, mu, logvar = self.ca_net(sent_emb)
-        # print('=====')
-        # print('first c_code.size():', c_code.size())  #(16, 100)
-        # print('=====')
+
         if cfg.TREE.BRANCH_NUM > 0:
             h_code1 = self.h_net1(z_code, c_code)
             fake_img1 = self.img_net1(h_code1)
             fake_imgs.append(fake_img1)
         if cfg.TREE.BRANCH_NUM > 1:
-            h_code2, att1 = \
-                self.h_net2(h_code1, c_code, word_embs, mask)
+            h_code2, att1 = self.h_net2(h_code1, c_code, word_embs, mask)
             fake_img2 = self.img_net2(h_code2)
             fake_imgs.append(fake_img2)
             if att1 is not None:
                 att_maps.append(att1)
         if cfg.TREE.BRANCH_NUM > 2:
-            h_code3, att2 = \
-                self.h_net3(h_code2, c_code, word_embs, mask)
+            h_code3, att2 = self.h_net3(h_code2, c_code, word_embs, mask)
             fake_img3 = self.img_net3(h_code3)
             fake_imgs.append(fake_img3)
             if att2 is not None:
                 att_maps.append(att2)
 
         return fake_imgs, att_maps, mu, logvar
-
 
 
 class G_DCGAN(nn.Module):
@@ -551,8 +600,7 @@ class G_DCGAN(nn.Module):
 # ############## D networks ##########################
 def Block3x3_leakRelu(in_planes, out_planes):
     block = nn.Sequential(
-        conv3x3(in_planes, out_planes),
-        nn.BatchNorm2d(out_planes),
+        SpectralNorm(conv3x3(in_planes, out_planes, bias=True)),
         nn.LeakyReLU(0.2, inplace=True)
     )
     return block
@@ -561,8 +609,7 @@ def Block3x3_leakRelu(in_planes, out_planes):
 # Downsale the spatial size by a factor of 2
 def downBlock(in_planes, out_planes):
     block = nn.Sequential(
-        nn.Conv2d(in_planes, out_planes, 4, 2, 1, bias=False),
-        nn.BatchNorm2d(out_planes),
+        SpectralNorm(nn.Conv2d(in_planes, out_planes, 4, 2, 1, bias=True)),
         nn.LeakyReLU(0.2, inplace=True)
     )
     return block
@@ -570,24 +617,16 @@ def downBlock(in_planes, out_planes):
 
 # Downsale the spatial size by a factor of 16
 def encode_image_by_16times(ndf):
-    encode_img = nn.Sequential(
-        # --> state size. ndf x in_size/2 x in_size/2
-        nn.Conv2d(3, ndf, 4, 2, 1, bias=False),
-        nn.LeakyReLU(0.2, inplace=True),
-        # --> state size 2ndf x x in_size/4 x in_size/4
-        nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-        nn.BatchNorm2d(ndf * 2),
-        nn.LeakyReLU(0.2, inplace=True),
-        # --> state size 4ndf x in_size/8 x in_size/8
-        nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-        nn.BatchNorm2d(ndf * 4),
-        nn.LeakyReLU(0.2, inplace=True),
-        # --> state size 8ndf x in_size/16 x in_size/16
-        nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-        nn.BatchNorm2d(ndf * 8),
-        nn.LeakyReLU(0.2, inplace=True)
-    )
-    return encode_img
+    layers = []
+    layers.append(SpectralNorm(nn.Conv2d(3, ndf, 4, 2, 1, bias=True)))
+    layers.append(nn.LeakyReLU(0.2, inplace=True),)
+    layers.append(SpectralNorm(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=True)))
+    layers.append(nn.LeakyReLU(0.2, inplace=True))
+    layers.append(SpectralNorm(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=True)))
+    layers.append(nn.LeakyReLU(0.2, inplace=True))
+    layers.append(SpectralNorm(nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=True)))
+    layers.append(nn.LeakyReLU(0.2, inplace=True))
+    return nn.Sequential(*layers)
 
 
 class D_GET_LOGITS(nn.Module):
@@ -614,6 +653,7 @@ class D_GET_LOGITS(nn.Module):
             h_c_code = self.jointConv(h_c_code)
         else:
             h_c_code = h_code
+
         output = self.outlogits(h_c_code)
         return output.view(-1)
 
@@ -683,6 +723,8 @@ class D_NET256(nn.Module):
         x_code4 = self.img_code_s64_1(x_code4)
         x_code4 = self.img_code_s64_2(x_code4)
         return x_code4
+
+
 class CAPTION_CNN(nn.Module):
     def __init__(self, embed_size):
         """Load the pretrained ResNet-152 and replace top fc layer."""
