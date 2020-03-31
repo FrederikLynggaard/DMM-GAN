@@ -15,13 +15,13 @@ TRAIN:
     BATCH_SIZE: 10
     NET_E: '../DAMSMencoders/text_encoder600.pth'
 
-GAN: # TODO: Align DF_DIM and GF_DIM
-    DF_DIM: 64
-    GF_DIM: 32
+GAN:
+    DF_DIM: 32
+    GF_DIM: 64
     Z_DIM: 100
     R_NUM: 2
 
 TEXT:
     EMBEDDING_DIM: 256
     CAPTIONS_PER_IMAGE: 10
-    WORDS_NUM: 25
+    WORDS_NUM: 27

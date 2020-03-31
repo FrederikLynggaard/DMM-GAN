@@ -147,7 +147,7 @@ class RNN_ENCODER(nn.Module):
         else:
             sent_emb = hidden.transpose(0, 1).contiguous()
         sent_emb = sent_emb.view(-1, self.nhidden * self.num_directions)
-        return words_emb, sent_emb  # TODO make sure sent_emb includes only relevant tokens
+        return words_emb, sent_emb
 
 
 class CNN_ENCODER(nn.Module):
