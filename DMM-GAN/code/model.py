@@ -147,7 +147,7 @@ class RNN_ENCODER(nn.Module):
         else:
             sent_emb = hidden.transpose(0, 1).contiguous()
         sent_emb = sent_emb.view(-1, self.nhidden * self.num_directions)
-        return words_emb, sent_emb
+        return words_emb, sent_emb  # TODO make sure sent_emb includes only relevant tokens
 
 
 class CNN_ENCODER(nn.Module):
@@ -359,16 +359,15 @@ class INIT_STAGE_G(nn.Module):
         return out_code64
 
 
-class Memory(nn.Module):
+class LocalMemory(nn.Module):
     def __init__(self):
-        super(Memory, self).__init__()
-        self.sm = nn.Softmax()
+        super(LocalMemory, self).__init__()
         self.mask = None
 
     def applyMask(self, mask):
         self.mask = mask  # batch x sourceL
 
-    def forward(self, input, context_key, content_value):#
+    def forward(self, input, context_key, context_value):#
         """
             input: batch x idf x ih x iw (queryL=ihxiw)
             context: batch x idf x sourceL
@@ -400,7 +399,47 @@ class Memory(nn.Module):
         weight = torch.transpose(weight, 1, 2).contiguous()
 
         # (batch x idf x sourceL)(batch x sourceL x queryL) --> batch x idf x queryL
-        weightedContext = torch.bmm(content_value, weight)  #
+        weightedContext = torch.bmm(context_value, weight)  #
+        weightedContext = weightedContext.view(batch_size, -1, ih, iw)
+        weight = weight.view(batch_size, -1, ih, iw)
+
+        return weightedContext, weight
+
+
+class GlobalMemory(nn.Module):
+    def __init__(self):
+        super(GlobalMemory, self).__init__()
+
+    def forward(self, input, context_key, context_value):#
+        """
+            input: batch x idf x ih x iw (queryL=ihxiw)
+            context: batch x idf x 1
+        """
+        ih, iw = input.size(2), input.size(3)
+        queryL = ih * iw
+        batch_size, idf = context_key.size(0), context_key.size(1)
+
+        # --> batch x idf x queryL
+        target = input.view(batch_size, -1, queryL)
+        # targetT = torch.transpose(target, 1, 2).contiguous()
+        source = context_key
+
+        #  batch x idf x queryL
+        weight = torch.mul(target, source)
+        #  --> batch x queryL x idf
+        weight = torch.transpose(weight, 1, 2).contiguous()
+
+        # --> batch*queryL x idf   --> softmax
+        weight = weight.view(batch_size * queryL, idf)
+        weight = torch.nn.functional.softmax(weight, dim=1)
+
+        # --> batch x queryL x idf
+        weight = weight.view(batch_size, queryL, idf)
+
+        # --> batch x idf x queryL
+        weight = torch.transpose(weight, 1, 2).contiguous()
+
+        weightedContext = torch.mul(weight, context_value)
         weightedContext = weightedContext.view(batch_size, -1, ih, iw)
         weight = weight.view(batch_size, -1, ih, iw)
 
@@ -439,20 +478,34 @@ class NEXT_STAGE_G(nn.Module):
             nn.ReLU()
         )
         self.key = nn.Sequential(
-            nn.Conv1d(ngf*2, ngf, kernel_size=1, stride=1, padding=0),
+            nn.Conv1d(ngf * 2, ngf, kernel_size=1, stride=1, padding=0),
             nn.ReLU()
         )
         self.value = nn.Sequential(
-            nn.Conv1d(ngf*2, ngf, kernel_size=1, stride=1, padding=0),
+            nn.Conv1d(ngf * 2, ngf, kernel_size=1, stride=1, padding=0),
             nn.ReLU()
         )
-        self.memory_operation = Memory()
-        self.response_gate = nn.Sequential(
-            nn.Conv2d(self.gf_dim * 2, 1, kernel_size=1, stride=1, padding=0),
-            nn.Sigmoid()
-        )
+        self.memory_operation = LocalMemory()
         self.residual = self._make_layer(ResBlock, ngf * 2)
         self.upsample = upBlock(ngf * 2, ngf)
+
+        if cfg.TRAIN.INCLUDE_GL_DM:
+            self.memory_operation_c = GlobalMemory()
+            self.response_gate = nn.Sequential(
+                nn.Conv2d(self.gf_dim * 3, 3, kernel_size=1, stride=1, padding=0),
+                nn.Softmax()
+            )
+            self.A_c = nn.Linear(self.cf_dim, 1, bias=False)
+            self.B_c = nn.Linear(self.gf_dim, 1, bias=False)
+            self.M_c = nn.Sequential(
+                nn.Conv1d(self.cf_dim, ngf * 2, kernel_size=1, stride=1, padding=0),
+                nn.ReLU()
+            )
+        else:
+            self.response_gate = nn.Sequential(
+                nn.Conv2d(self.gf_dim * 2, 1, kernel_size=1, stride=1, padding=0),
+                nn.Sigmoid()
+            )
 
     def forward(self, h_code, c_code, word_embs, mask):
         """
@@ -466,11 +519,12 @@ class NEXT_STAGE_G(nn.Module):
         h_code_avg = self.avg(h_code).detach()
         h_code_avg = h_code_avg.squeeze(3)
         h_code_avg_T = torch.transpose(h_code_avg, 1, 2).contiguous()
+
         gate1 = torch.transpose(self.A(word_embs_T), 1, 2).contiguous()
         gate2 = self.B(h_code_avg_T).repeat(1, 1, word_embs.size(2))
         writing_gate = torch.sigmoid(gate1 + gate2)
-        h_code_avg = h_code_avg.repeat(1, 1, word_embs.size(2))
-        memory = self.M_w(word_embs) * writing_gate + self.M_r(h_code_avg) * (1 - writing_gate)
+        h_code_avg_repeated = h_code_avg.repeat(1, 1, word_embs.size(2))
+        memory = self.M_w(word_embs) * writing_gate + self.M_r(h_code_avg_repeated) * (1 - writing_gate)
 
         # Key Addressing and Value Reading
         key = self.key(memory)
@@ -478,14 +532,106 @@ class NEXT_STAGE_G(nn.Module):
         self.memory_operation.applyMask(mask)
         memory_out, att = self.memory_operation(h_code, key, value)
 
-        # Key Response
-        response_gate = self.response_gate(torch.cat((h_code, memory_out), 1))
-        h_code_new = h_code * (1 - response_gate) + response_gate * memory_out
-        h_code_new = torch.cat((h_code_new, h_code_new), 1)
+        if cfg.TRAIN.INCLUDE_GL_DM:
+            c_code = c_code.unsqueeze(2)
+            c_code_T = torch.transpose(c_code, 1, 2).contiguous()
+            gate1_c = torch.transpose(self.A_c(c_code_T), 1, 2).contiguous()
+            gate2_c = self.B_c(h_code_avg_T)
+            writing_gate_c = torch.sigmoid(gate1_c + gate2_c)
+            memory_c = self.M_c(c_code) * writing_gate_c + self.M_r(h_code_avg) * (1 - writing_gate_c)
+
+            # Key Addressing and Value Reading
+            key_c = self.key(memory_c)
+            value_c = self.value(memory_c)
+            memory_out_c, att_c = self.memory_operation_c(h_code, key_c, value_c)
+
+            # Key Response
+            response_gate = self.response_gate(torch.cat((h_code, memory_out, memory_out_c), 1))
+            g_h = response_gate[:, 0, :, :].unsqueeze(1)
+            g_out = response_gate[:, 1, :, :].unsqueeze(1)
+            g_out_c = response_gate[:, 2, :, :].unsqueeze(1)
+            h_code_new = g_h * h_code + g_out * memory_out + g_out_c * memory_out_c
+            h_code_new = torch.cat((h_code_new, h_code_new), 1)
+        else:
+            # Key Response
+            response_gate = self.response_gate(torch.cat((h_code, memory_out), 1))
+            h_code_new = h_code * (1 - response_gate) + response_gate * memory_out
+            h_code_new = torch.cat((h_code_new, h_code_new), 1)
 
         out_code = self.residual(h_code_new)
         # state size ngf/2 x 2in_size x 2in_size
         out_code = self.upsample(out_code)
+
+        """
+        if cfg.TRAIN.INCLUDE_GL_DM:
+            # Memory Writing
+            word_embs_T = torch.transpose(word_embs, 1, 2).contiguous()
+            h_code_avg = self.avg(h_code).detach()
+            h_code_avg = h_code_avg.squeeze(3)
+            h_code_avg_T = torch.transpose(h_code_avg, 1, 2).contiguous()
+
+            gate1 = torch.transpose(self.A(word_embs_T), 1, 2).contiguous()
+            gate2 = self.B(h_code_avg_T).repeat(1, 1, word_embs.size(2))
+            writing_gate = torch.sigmoid(gate1 + gate2)
+            h_code_avg_repeated = h_code_avg.repeat(1, 1, word_embs.size(2))
+            memory = self.M_w(word_embs) * writing_gate + self.M_r(h_code_avg_repeated) * (1 - writing_gate)
+
+            c_code = c_code.unsqueeze(2)
+            c_code_T = torch.transpose(c_code, 1, 2).contiguous()
+            gate1_c = torch.transpose(self.A_c(c_code_T), 1, 2).contiguous()
+            gate2_c = self.B_c(h_code_avg_T)
+            writing_gate_c = torch.sigmoid(gate1_c + gate2_c)
+            memory_c = self.M_c(c_code) * writing_gate_c + self.M_r(h_code_avg) * (1 - writing_gate_c)
+
+            # Key Addressing and Value Reading
+            key = self.key(memory)
+            value = self.value(memory)
+            self.memory_operation.applyMask(mask)
+            memory_out, att = self.memory_operation(h_code, key, value)
+
+            key_c = self.key(memory_c)
+            value_c = self.value(memory_c)
+            memory_out_c, att_c = self.memory_operation_c(h_code, key_c, value_c)
+
+            # Key Response
+            response_gate = self.response_gate(torch.cat((h_code, memory_out, memory_out_c), 1))
+            g_h = response_gate[:, 0, :, :].unsqueeze(1)
+            g_out = response_gate[:, 1, :, :].unsqueeze(1)
+            g_out_c = response_gate[:, 2, :, :].unsqueeze(1)
+            h_code_new = g_h * h_code + g_out * memory_out + g_out_c * memory_out_c
+            h_code_new = torch.cat((h_code_new, h_code_new), 1)
+
+            out_code = self.residual(h_code_new)
+            # state size ngf/2 x 2in_size x 2in_size
+            out_code = self.upsample(out_code)
+        else:
+            # Memory Writing
+            word_embs_T = torch.transpose(word_embs, 1, 2).contiguous()
+            h_code_avg = self.avg(h_code).detach()
+            h_code_avg = h_code_avg.squeeze(3)
+            h_code_avg_T = torch.transpose(h_code_avg, 1, 2).contiguous()
+            gate1 = torch.transpose(self.A(word_embs_T), 1, 2).contiguous()
+            gate2 = self.B(h_code_avg_T).repeat(1, 1, word_embs.size(2))
+            writing_gate = torch.sigmoid(gate1 + gate2)
+            h_code_avg = h_code_avg.repeat(1, 1, word_embs.size(2))
+            memory = self.M_w(word_embs) * writing_gate + self.M_r(h_code_avg) * (1 - writing_gate)
+
+            # Key Addressing and Value Reading
+            key = self.key(memory)
+            value = self.value(memory)
+            self.memory_operation.applyMask(mask)
+            memory_out, att = self.memory_operation(h_code, key, value)
+
+            # Key Response
+            response_gate = self.response_gate(torch.cat((h_code, memory_out), 1))
+            h_code_new = h_code * (1 - response_gate) + response_gate * memory_out
+            h_code_new = torch.cat((h_code_new, h_code_new), 1)
+
+            out_code = self.residual(h_code_new)
+            # state size ngf/2 x 2in_size x 2in_size
+            out_code = self.upsample(out_code)
+            """
+
         return out_code, att
 
 

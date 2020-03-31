@@ -12,14 +12,15 @@ TRAIN:
     FLAG: True
     NET_G: ''
     B_NET_D: True
-    BATCH_SIZE: 8  # 22
+    BATCH_SIZE: 6  # 22
     MAX_EPOCH: 650
     SNAPSHOT_INTERVAL: 25
     DISCRIMINATOR_LR: 0.0002
     GENERATOR_LR: 0.0002
 
-    INCLUDE_STREAM: True
-    INCLUDE_DAMSM: False
+    INCLUDE_STREAM: True  # Semantic Text REgeneration and Alignment Module
+    INCLUDE_DAMSM: False  # Deep Attentional Multimodal Similarity Model
+    INCLUDE_GL_DM: True  # Global Local Dynamic Memory
 
     NET_E: '../DAMSMencoders/text_encoder600.pth'
     SMOOTH:
