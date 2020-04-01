@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 import torch.backends.cudnn as cudnn
 from PIL import Image
-from cfg.config import cfg
+from miscc.config import cfg
 from miscc.utils import mkdir_p
 from miscc.utils import build_super_images, build_super_images2
 from miscc.utils import weights_init, load_params, copy_G_params
@@ -253,7 +253,7 @@ class Trainer(object):
                 # sent_emb: batch_size x nef
                 words_embs, sent_emb = text_encoder(captions, cap_lens, hidden)
                 words_embs, sent_emb = words_embs.detach(), sent_emb.detach()
-                mask = (captions == 0)
+                mask = (captions == 0) + (captions == 1) + (captions == 2)  # masked <start>, <end>, <pad>
                 num_words = words_embs.size(2)
                 if mask.size(1) > num_words:
                     mask = mask[:, :num_words]
@@ -391,7 +391,7 @@ class Trainer(object):
                     # sent_emb: batch_size x nef
                     words_embs, sent_emb = text_encoder(captions, cap_lens, hidden)
                     words_embs, sent_emb = words_embs.detach(), sent_emb.detach()
-                    mask = (captions == 0)
+                    mask = (captions == 0) + (captions == 1) + (captions == 2)  # masked <start>, <end>, <pad>
                     num_words = words_embs.size(2)
                     if mask.size(1) > num_words:
                         mask = mask[:, :num_words]
@@ -463,7 +463,7 @@ class Trainer(object):
                     # words_embs: batch_size x nef x seq_len
                     # sent_emb: batch_size x nef
                     words_embs, sent_emb = text_encoder(captions, cap_lens, hidden)
-                    mask = (captions == 0)
+                    mask = (captions == 0) + (captions == 1) + (captions == 2)  # masked <start>, <end>, <pad>
                     # (2) Generate fake images
                     noise.data.normal_(0, 1)
                     fake_imgs, attention_maps, _, _ = netG(noise, sent_emb, words_embs, mask)

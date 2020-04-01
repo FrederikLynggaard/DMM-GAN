@@ -13,7 +13,7 @@ TRAIN:
     NET_G: './data/output/bird/Model/netG_epoch_275.pth'   # path to the trained model
     B_NET_D: False
     BATCH_SIZE: 10
-    NET_E: './data/STEM/text_encoder600.pth'
+    NET_E: './data/STEM/text_encoder200.pth'
 GAN:
     DF_DIM: 64
     GF_DIM: 32
@@ -23,4 +23,4 @@ GAN:
 TEXT:
     EMBEDDING_DIM: 256
     CAPTIONS_PER_IMAGE: 10
-    WORDS_NUM: 25
+    WORDS_NUM: 27

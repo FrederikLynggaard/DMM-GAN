@@ -23,7 +23,7 @@ TRAIN:
         GAMMA2: 5.0
         GAMMA3: 10.0  # 10good 1&100bad
         LAMBDA: 0.0
-        LAMBDA1: 10.0
+        LAMBDA1: 20.0
 
 CAP:
     embed_size: 256

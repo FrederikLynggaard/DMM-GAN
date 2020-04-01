@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 import numpy as np
-from cfg.config import cfg
+from miscc.config import cfg
 from torch.nn.utils.rnn import pack_padded_sequence
 from GLAttention import func_attention
 

@@ -3,7 +3,7 @@ from __future__ import print_function
 from miscc.utils import mkdir_p
 from miscc.utils import build_super_images
 from miscc.losses import sent_loss, words_loss
-from cfg.config import cfg, cfg_from_file
+from miscc.config import cfg, cfg_from_file
 
 from datasets import TextDataset
 from datasets import prepare_data
