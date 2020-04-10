@@ -44,16 +44,19 @@ class Trainer(object):
         if cfg.TRAIN.NET_E == '':
             print('Error: no pretrained text-image encoders')
             return
+        if cfg.TRAIN.INCLUDE_DAMSM:
+            image_encoder = CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
+            img_encoder_path = cfg.TRAIN.NET_E.replace('text_encoder', 'image_encoder')
+            state_dict = \
+                torch.load(img_encoder_path, map_location=lambda storage, loc: storage)
+            image_encoder.load_state_dict(state_dict)
+            for p in image_encoder.parameters():
+                p.requires_grad = False
+            print('Load image encoder from:', img_encoder_path)
+            image_encoder.eval()
+        else:
+            image_encoder = None
 
-        image_encoder = CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
-        img_encoder_path = cfg.TRAIN.NET_E.replace('text_encoder', 'image_encoder')
-        state_dict = \
-            torch.load(img_encoder_path, map_location=lambda storage, loc: storage)
-        image_encoder.load_state_dict(state_dict)
-        for p in image_encoder.parameters():
-            p.requires_grad = False
-        print('Load image encoder from:', img_encoder_path)
-        image_encoder.eval()
 
         text_encoder = \
             RNN_ENCODER(self.n_words, nhidden=cfg.TEXT.EMBEDDING_DIM)
@@ -134,7 +137,8 @@ class Trainer(object):
 
         if cfg.CUDA:
             text_encoder = text_encoder.cuda()
-            image_encoder = image_encoder.cuda()
+            if cfg.TRAIN.INCLUDE_DAMSM:
+                image_encoder = image_encoder.cuda()
             if cfg.TRAIN.INCLUDE_STREAM:
                 caption_cnn = caption_cnn.cuda()
                 caption_rnn = caption_rnn.cuda()
@@ -303,9 +307,10 @@ class Trainer(object):
                     print('Saving images...')
                     backup_para = copy_G_params(netG)
                     load_params(netG, avg_param_G)
-                    self.save_img_results(netG, fixed_noise, sent_emb,
-                                          words_embs, mask, image_encoder,
-                                          captions, cap_lens, epoch, name='average')
+                    if cfg.TRAIN.INCLUDE_DAMSM:
+                        self.save_img_results(netG, fixed_noise, sent_emb,
+                                              words_embs, mask, image_encoder,
+                                              captions, cap_lens, epoch, name='average')
                     load_params(netG, backup_para)
             end_t = time.time()
 

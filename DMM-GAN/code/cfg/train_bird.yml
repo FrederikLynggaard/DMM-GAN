@@ -12,7 +12,7 @@ TRAIN:
     FLAG: True
     NET_G: ''
     B_NET_D: True
-    BATCH_SIZE: 6  # 22
+    BATCH_SIZE: 8  # 22
     MAX_EPOCH: 650
     SNAPSHOT_INTERVAL: 25
     DISCRIMINATOR_LR: 0.0002
@@ -22,7 +22,7 @@ TRAIN:
     INCLUDE_DAMSM: False  # Deep Attentional Multimodal Similarity Model
     INCLUDE_GL_DM: True  # Global Local Dynamic Memory
 
-    NET_E: '../DAMSMencoders/text_encoder600.pth'
+    NET_E: '../DAMSMencoders/text_encoder200.pth'
     SMOOTH:
         GAMMA1: 4.0  # 1,2,5 good 4 best  10&100bad
         GAMMA2: 5.0
@@ -35,8 +35,8 @@ CAP: # TODO: All caps
     hidden_size: 256
     num_layers: 1
     learning_rate: 0.001
-    caption_cnn_path: '../STREAM/encoder-1000.ckpt'
-    caption_rnn_path: '../STREAM/decoder-1000.ckpt'
+    caption_cnn_path: '../STREAM/encoder-200.ckpt'
+    caption_rnn_path: '../STREAM/decoder-200.ckpt'
 
 GAN:
     DF_DIM: 32
