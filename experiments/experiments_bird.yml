@@ -1,0 +1,23 @@
+CONFIG_NAME: 'experiments'
+DATASET_NAME: 'birds'
+GPU_ID: 0
+WORKERS: 4
+OUTPUT_PATH: '../'
+
+
+MODELS:
+    AttnGAN:
+        RUN: True
+        WORKING_DIR: '../AttnGAN/code'
+        CONFIG_PATH: 'cfg/eval_bird.yml'
+        G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\AttnGAN\netG_epoch_600.pth'
+        TEXT_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\text_encoder200.pth'
+        IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\image_encoder200.pth' # TODO refactor w. replace trick
+
+
+#    DMM_GAN:
+#        MODEL_PATH: '../DMM-GAN/code/model.py'
+#        VERSIONS:
+#            GLDM-TRUE_STREAM-FALSE:
+#                RUN: False
+#                CONFIG_PATH: 'blabla'
