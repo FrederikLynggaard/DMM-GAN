@@ -105,4 +105,4 @@ def cfg_from_file(filename):
     _merge_a_into_b(yaml_cfg, __C)
 
 # TODO Remember to set this to relevant config
-cfg_from_file('cfg/DAMSM/bird.yml')
+cfg_from_file('cfg/bird_DMGAN.yml')
