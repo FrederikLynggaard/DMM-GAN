@@ -6,6 +6,8 @@
 
 from __future__ import print_function
 
+import errno
+
 from PIL import Image
 from torch.autograd import Variable
 
@@ -25,11 +27,21 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
 dir_path = (os.path.abspath(os.path.join(os.path.realpath(__file__), './.')))
 sys.path.append(dir_path)
 
 
-def evaluate(netG, image_encoder, text_encoder, dataloader, output_dir):
+def evaluate(netG, image_encoder, text_encoder, dataloader, output_dir, name):
     for step, data in enumerate(dataloader, 0):
 
         imgs, captions, cap_lens, class_ids, keys = prepare_data(data)
@@ -53,22 +65,20 @@ def evaluate(netG, image_encoder, text_encoder, dataloader, output_dir):
         noise.data.normal_(0, 1)
         fake_imgs, _, _, _ = netG(noise, sent_emb, words_embs, mask)
         for j in range(dataloader.batch_size):
-            s_tmp = '%s/single/%s' % (output_dir, keys[j])
+            s_tmp = '%s/%s/%s' % (output_dir, name, keys[j])
             folder = s_tmp[:s_tmp.rfind('/')]
             if not os.path.isdir(folder):
                 # print('Make a new folder: ', folder)
                 os.chdir(main_wd)
-                os.makedirs(folder)
+                mkdir_p(folder)
                 os.chdir(model_wd)
-            k = -1
-            # for k in range(len(fake_imgs)):
-            im = fake_imgs[k][j].data.cpu().numpy()
+            im = fake_imgs[-1][j].data.cpu().numpy()
             # [-1, 1] --> [0, 255]
             im = (im + 1.0) * 127.5
             im = im.astype(np.uint8)
             im = np.transpose(im, (1, 2, 0))
             im = Image.fromarray(im)
-            fullpath = '%s_s%d.png' % (s_tmp, k)
+            fullpath = '%s.png' % s_tmp
             os.chdir(main_wd)
             im.save(fullpath)
             os.chdir(model_wd)
@@ -207,9 +217,18 @@ if __name__ == "__main__":
     print('Using config:')
     pprint.pprint(cfg)
 
+    now = datetime.datetime.now(dateutil.tz.tzlocal())
+    timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
+    output_dir = 'output/%s_%s_%s' % \
+                 (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
+    mkdir_p(output_dir)  # TODO remove from loop
+
+
     for x in cfg.MODELS.keys():
+        os.chdir(main_wd)
         model_info = cfg.MODELS[x]
         model_wd = model_info.WORKING_DIR
+
         os.chdir(model_wd)
 
         config_py = import_module('miscc.config')
@@ -225,74 +244,72 @@ if __name__ == "__main__":
         utils_py = import_module('miscc.utils')
         weights_init = getattr(utils_py, 'weights_init')
 
-        G_NET = getattr(model_py, 'G_NET')
-
         datasets_py = import_module('datasets')
         TextDataset = getattr(datasets_py, 'TextDataset')
         prepare_data = getattr(datasets_py, 'prepare_data')
 
-        os.chdir(main_wd)
 
 
-        manual_seed = 100
-        random.seed(manual_seed)
-        np.random.seed(manual_seed)
-        torch.manual_seed(manual_seed)
-        if cfg.CUDA:
-            torch.cuda.manual_seed_all(manual_seed)
+        for version in model_info.VERSIONS.keys():
+            version_info = model_info.VERSIONS[version]
 
-        now = datetime.datetime.now(dateutil.tz.tzlocal())
-        timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
-        os.chdir(main_wd)
-        output_dir = 'output/%s_%s_%s' % \
-            (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
-        os.makedirs(output_dir)
-        os.chdir(model_wd)
-
-        # Get data loader
-        split_dir, bshuffle = 'test', True
-        imsize = cfg_x.TREE.BASE_SIZE * (2 ** (cfg_x.TREE.BRANCH_NUM - 1))
-        image_transform = transforms.Compose([
-            transforms.Resize(int(imsize * 76 / 64)),
-            transforms.RandomCrop(imsize),
-            transforms.RandomHorizontalFlip()])
-        dataset = TextDataset(cfg_x.DATA_DIR, split_dir,
-                              base_size=cfg_x.TREE.BASE_SIZE,
-                              transform=image_transform)
-        assert dataset
-        dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=cfg_x.TRAIN.BATCH_SIZE,
-            drop_last=True, shuffle=bshuffle, num_workers=int(cfg.WORKERS))
+            manual_seed = 100
+            random.seed(manual_seed)
+            np.random.seed(manual_seed)
+            torch.manual_seed(manual_seed)
+            if cfg.CUDA:
+                torch.cuda.manual_seed_all(manual_seed)
 
 
 
-        # load image encoder
-        image_encoder = CNN_ENCODER(cfg_x.TEXT.EMBEDDING_DIM)
-        state_dict = torch.load(model_info.IMAGE_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
-        image_encoder.load_state_dict(state_dict)
-        print('Load image encoder from:', model_info.IMAGE_ENCODER_WEIGHTS_PATH)
-        image_encoder = image_encoder.cuda()
-        image_encoder.eval()
+            # Get data loader
+            split_dir, bshuffle = 'test', True
+            imsize = cfg_x.TREE.BASE_SIZE * (2 ** (cfg_x.TREE.BRANCH_NUM - 1))
+            image_transform = transforms.Compose([
+                transforms.Resize(int(imsize * 76 / 64)),
+                transforms.RandomCrop(imsize),
+                transforms.RandomHorizontalFlip()])
+            dataset = TextDataset(cfg_x.DATA_DIR, split_dir,
+                                  base_size=cfg_x.TREE.BASE_SIZE,
+                                  transform=image_transform)
+            assert dataset
+            dataloader = torch.utils.data.DataLoader(
+                dataset, batch_size=cfg_x.TRAIN.BATCH_SIZE,
+                drop_last=True, shuffle=bshuffle, num_workers=int(cfg.WORKERS))
 
-        # load generator network
-        netG = G_NET()
-        netG.apply(weights_init)
-        netG.cuda()
-        netG.eval()
-        model_dir = model_info.G_NET_WEIGHTS_PATH
-        state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
-        netG.load_state_dict(state_dict)
-        print('Load G from: ', model_dir)
 
-        # load text encoder
-        text_encoder = RNN_ENCODER(dataset.n_words, nhidden=cfg_x.TEXT.EMBEDDING_DIM)
-        state_dict = torch.load(model_info.TEXT_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
-        text_encoder.load_state_dict(state_dict)
-        print('Load text encoder from:', model_info.TEXT_ENCODER_WEIGHTS_PATH)
-        text_encoder = text_encoder.cuda()
-        text_encoder.eval()
 
-        start_t = time.time()
-        evaluate(netG, image_encoder, text_encoder, dataloader, output_dir)
-        end_t = time.time()
-        print('Total time for training:', end_t - start_t)
+            # load image encoder
+            # image_encoder = CNN_ENCODER(cfg_x.TEXT.EMBEDDING_DIM)
+            # state_dict = torch.load(model_info.IMAGE_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
+            # image_encoder.load_state_dict(state_dict)
+            # print('Load image encoder from:', model_info.IMAGE_ENCODER_WEIGHTS_PATH)
+            # image_encoder = image_encoder.cuda()
+            # image_encoder.eval()
+
+            # load generator network
+            if 'CONFIG_PATH' in version_info.keys():
+                cfg_from_file_x(version_info.CONFIG_PATH)
+            netG = G_NET()
+            netG.apply(weights_init)
+            netG.cuda()
+            netG.eval()
+            model_dir = version_info.G_NET_WEIGHTS_PATH
+            state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
+            netG.load_state_dict(state_dict)
+            print('Load G from: ', model_dir)
+
+            # load text encoder
+            text_encoder = RNN_ENCODER(dataset.n_words, nhidden=cfg_x.TEXT.EMBEDDING_DIM)
+            state_dict = torch.load(model_info.TEXT_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
+            text_encoder.load_state_dict(state_dict)
+            print('Load text encoder from:', model_info.TEXT_ENCODER_WEIGHTS_PATH)
+            text_encoder = text_encoder.cuda()
+            text_encoder.eval()
+
+            image_encoder = None
+
+            start_t = time.time()
+            evaluate(netG, image_encoder, text_encoder, dataloader, output_dir, '{}_{}'.format(x, version))
+            end_t = time.time()
+            print('Total time for training:', end_t - start_t)
