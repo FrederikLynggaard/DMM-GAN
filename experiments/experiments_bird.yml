@@ -4,6 +4,7 @@ GPU_ID: 0
 CUDA: True
 WORKERS: 4
 OUTPUT_PATH: '../'
+DATASET_IMGS_PATH: 'C:\Users\45207\PycharmProjects\DMM-GAN\AttnGAN\data\birds\CUB_200_2011\images'
 RUN: 'DMM-GAN'
 
 

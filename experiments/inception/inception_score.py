@@ -64,7 +64,6 @@ MOVING_AVERAGE_DECAY = 0.9999
 
 
 fullpath = FLAGS.image_folder
-print(fullpath)
 
 
 def preprocess(img):

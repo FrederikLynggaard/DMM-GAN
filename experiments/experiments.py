@@ -4,6 +4,7 @@ import errno
 
 from config import cfg, cfg_from_file
 from inception.inception_score import inception_score
+from frechet_inception_distance.fid_score import calculate_fid_given_paths
 
 from importlib import import_module
 import os
@@ -34,7 +35,9 @@ def mkdir_p(path):
 dir_path = (os.path.abspath(os.path.join(os.path.realpath(__file__), './.')))
 sys.path.append(dir_path)
 
-def evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir, name):
+def evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir, cfg, version):
+    name = '{}_{}'.format(cfg.RUN, version)
+
     cnt = 0
     R_count = 0
     R = np.zeros(30000)
@@ -118,9 +121,13 @@ def evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir,
 
     # calculate IS
     os.chdir(main_wd)
-    inception_score(output_dir+'/'+name)
-    os.chdir(model_wd)
+    fake_imgs_path = output_dir+'/'+name
+    inception_score(fake_imgs_path)
 
+    # calculate FID
+    fid = calculate_fid_given_paths([cfg.DATASET_IMGS_PATH, fake_imgs_path], dataloader.batch_size, cfg.CUDA, 2048)
+    print('FID: ', fid)
+    os.chdir(model_wd)
 
 
 
@@ -215,6 +222,6 @@ if __name__ == "__main__":
         text_encoder.eval()
 
         start_t = time.time()
-        evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir, '{}_{}'.format(cfg.RUN, version))
+        evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir, cfg, version)
         end_t = time.time()
         print('Total time for training:', end_t - start_t)
