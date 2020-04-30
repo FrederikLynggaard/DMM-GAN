@@ -153,6 +153,32 @@ class RNN_ENCODER(nn.Module):
         sent_emb = sent_emb.view(-1, self.nhidden * self.num_directions)
         return words_emb, sent_emb
 
+class CNN_ENCODER_MOCK(nn.Module):
+    def __init__(self, nef):
+        super(CNN_ENCODER_MOCK, self).__init__()
+        if cfg.TRAIN.FLAG:
+            self.nef = nef
+        else:
+            self.nef = 256  # define a uniform ranker
+
+        self.linear_mock = nn.Linear(268203, 32)
+
+        self.emb_features = nn.Linear(32, 289 * self.nef)
+        self.emb_cnn_code = nn.Linear(32, self.nef)
+
+
+    def forward(self, x):
+        # --> fixed-size input: batch x 3 x 299 x 299
+        x = nn.functional.interpolate(x, size=(299, 299), mode='bilinear', align_corners=False)
+        x = x.view(x.size(0), -1)
+        x = self.linear_mock(x)
+
+        cnn_code = self.emb_cnn_code(x)
+
+        features = self.emb_features(x)
+        features = features.view(x.size(0), -1, 17, 17)
+
+        return features, cnn_code
 
 class CNN_ENCODER(nn.Module):
     def __init__(self, nef):

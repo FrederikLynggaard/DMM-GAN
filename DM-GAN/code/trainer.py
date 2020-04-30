@@ -196,7 +196,7 @@ class condGANTrainer(object):
                          image_encoder, captions, cap_lens,
                          gen_iterations, real_image, name='current'):
         # Save images
-        fake_imgs, attention_maps, _, _ = netG(noise, sent_emb, words_embs, mask, cap_lens)
+        fake_imgs, attention_maps, _, _ = netG(noise, sent_emb, words_embs, mask)
         for i in range(len(attention_maps)):
             if len(fake_imgs) > 1:
                 img = fake_imgs[i + 1].detach().cpu()
@@ -446,7 +446,7 @@ class condGANTrainer(object):
                     # (2) Generate fake images
                     ######################################################
                     noise.data.normal_(0, 1)
-                    fake_imgs, _, _, _ = netG(noise, sent_emb, words_embs, mask, cap_lens)
+                    fake_imgs, _, _, _ = netG(noise, sent_emb, words_embs, mask)
                     for j in range(batch_size):
                         s_tmp = '%s/single/%s' % (save_dir, keys[j])
                         folder = s_tmp[:s_tmp.rfind('/')]
@@ -550,7 +550,7 @@ class condGANTrainer(object):
                     # (2) Generate fake images
                     ######################################################
                     noise.data.normal_(0, 1)
-                    fake_imgs, attention_maps, _, _ = netG(noise, sent_emb, words_embs, mask, cap_lens)
+                    fake_imgs, attention_maps, _, _ = netG(noise, sent_emb, words_embs, mask)
                     # G attention
                     cap_lens_np = cap_lens.cpu().data.numpy()
                     for j in range(batch_size):

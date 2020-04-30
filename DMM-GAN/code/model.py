@@ -274,6 +274,7 @@ class CNN_ENCODER_MOCK(nn.Module):
 
     def forward(self, x):
         # --> fixed-size input: batch x 3 x 299 x 299
+        x = nn.functional.interpolate(x, size=(299, 299), mode='bilinear', align_corners=False)
         x = x.view(x.size(0), -1)
         x = self.linear_mock(x)
 
@@ -283,7 +284,6 @@ class CNN_ENCODER_MOCK(nn.Module):
         features = features.view(x.size(0), -1, 17, 17)
 
         return features, cnn_code
-
 
 # ############## G networks ###################
 class CA_NET(nn.Module):

@@ -154,6 +154,32 @@ class RNN_ENCODER(nn.Module):
         sent_emb = sent_emb.view(-1, self.nhidden * self.num_directions)
         return words_emb, sent_emb
 
+class CNN_ENCODER_MOCK(nn.Module):
+    def __init__(self, nef):
+        super(CNN_ENCODER_MOCK, self).__init__()
+        if cfg.TRAIN.FLAG:
+            self.nef = nef
+        else:
+            self.nef = 256  # define a uniform ranker
+
+        self.linear_mock = nn.Linear(268203, 32)
+
+        self.emb_features = nn.Linear(32, 289 * self.nef)
+        self.emb_cnn_code = nn.Linear(32, self.nef)
+
+
+    def forward(self, x):
+        # --> fixed-size input: batch x 3 x 299 x 299
+        x = nn.functional.interpolate(x, size=(299, 299), mode='bilinear', align_corners=False)
+        x = x.view(x.size(0), -1)
+        x = self.linear_mock(x)
+
+        cnn_code = self.emb_cnn_code(x)
+
+        features = self.emb_features(x)
+        features = features.view(x.size(0), -1, 17, 17)
+
+        return features, cnn_code
 
 class CNN_ENCODER(nn.Module):
     def __init__(self, nef):
@@ -431,7 +457,7 @@ class NEXT_STAGE_G(nn.Module):
         self.residual = self._make_layer(ResBlock, ngf * 2)
         self.upsample = upBlock(ngf * 2, ngf)
 
-    def forward(self, h_code, c_code, word_embs, mask, cap_lens):
+    def forward(self, h_code, c_code, word_embs, mask):
         """
             h_code(image features):  batch x idf x ih x iw (queryL=ihxiw)
             word_embs(word features): batch x cdf x sourceL (sourceL=seq_len)
@@ -499,7 +525,7 @@ class G_NET(nn.Module):
             self.h_net3 = NEXT_STAGE_G(ngf, nef, ncf, 128)
             self.img_net3 = GET_IMAGE_G(ngf)
 
-    def forward(self, z_code, sent_emb, word_embs, mask, cap_lens):
+    def forward(self, z_code, sent_emb, word_embs, mask):
         """
             :param z_code: batch x cfg.GAN.Z_DIM
             :param sent_emb: batch x cfg.TEXT.EMBEDDING_DIM
@@ -516,13 +542,13 @@ class G_NET(nn.Module):
             fake_img1 = self.img_net1(h_code1)
             fake_imgs.append(fake_img1)
         if cfg.TREE.BRANCH_NUM > 1:
-            h_code2, att1 = self.h_net2(h_code1, c_code, word_embs, mask, cap_lens)
+            h_code2, att1 = self.h_net2(h_code1, c_code, word_embs, mask)
             fake_img2 = self.img_net2(h_code2)
             fake_imgs.append(fake_img2)
             if att1 is not None:
                 att_maps.append(att1)
         if cfg.TREE.BRANCH_NUM > 2:
-            h_code3, att2 = self.h_net3(h_code2, c_code, word_embs, mask, cap_lens)
+            h_code3, att2 = self.h_net3(h_code2, c_code, word_embs, mask)
             fake_img3 = self.img_net3(h_code3)
             fake_imgs.append(fake_img3)
             if att2 is not None:
