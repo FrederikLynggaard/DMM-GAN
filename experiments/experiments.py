@@ -2,10 +2,8 @@ from __future__ import print_function
 
 import errno
 
-from PIL import Image
-from torch.autograd import Variable
-
 from config import cfg, cfg_from_file
+from inception.inception_score import inception_score
 
 from importlib import import_module
 import os
@@ -19,7 +17,9 @@ import argparse
 import numpy as np
 
 import torch
+from torch.autograd import Variable
 import torchvision.transforms as transforms
+from PIL import Image
 
 
 def mkdir_p(path):
@@ -104,7 +104,7 @@ def evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir,
                     R[R_count] = 1
                 R_count += 1
 
-            if R_count >= 1000:
+            if R_count >= 100:
                 sum = np.zeros(10)
                 np.random.shuffle(R)
                 for i in range(10):
@@ -116,131 +116,13 @@ def evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir,
                 break
     ii += 1
 
-# def evaluate():
-#     if cfg.TRAIN.NET_G == '':
-#         print('Error: the path for morels is not found!')
-#     else:
-#         if split_dir == 'test':
-#             split_dir = 'valid'
-#         # Build and load the generator
-#         if cfg.GAN.B_DCGAN:
-#             netG = G_DCGAN()
-#         else:
-#             netG = G_NET()
-#         netG.apply(weights_init)
-#         netG.cuda()
-#         netG.eval()
-#
-#         # load text encoder
-#         text_encoder = RNN_ENCODER(self.n_words, nhidden=cfg.TEXT.EMBEDDING_DIM)
-#         state_dict = torch.load(cfg.TRAIN.NET_E, map_location=lambda storage, loc: storage)
-#         text_encoder.load_state_dict(state_dict)
-#         print('Load text encoder from:', cfg.TRAIN.NET_E)
-#         text_encoder = text_encoder.cuda()
-#         text_encoder.eval()
-#
-#         # load image encoder
-#         image_encoder = CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
-#         img_encoder_path = cfg.TRAIN.NET_E.replace('text_encoder', 'image_encoder')
-#         state_dict = torch.load(img_encoder_path, map_location=lambda storage, loc: storage)
-#         image_encoder.load_state_dict(state_dict)
-#         print('Load image encoder from:', img_encoder_path)
-#         image_encoder = image_encoder.cuda()
-#         image_encoder.eval()
-#
-#         batch_size = self.batch_size
-#         nz = cfg.GAN.Z_DIM
-#         noise = Variable(torch.FloatTensor(batch_size, nz), volatile=True)
-#         noise = noise.cuda()
-#
-#         model_dir = cfg.TRAIN.NET_G
-#         state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
-#         # state_dict = torch.load(cfg.TRAIN.NET_G)
-#         netG.load_state_dict(state_dict)
-#         print('Load G from: ', model_dir)
-#
-#         # the path to save generated images
-#         s_tmp = model_dir[:model_dir.rfind('.pth')]
-#         save_dir = '%s/%s' % (s_tmp, split_dir)
-#         mkdir_p(save_dir)
-#
-#         cnt = 0
-#         R_count = 0
-#         R = np.zeros(30000)
-#         cont = True
-#         for ii in range(11):  # (cfg.TEXT.CAPTIONS_PER_IMAGE):
-#             if (cont == False):
-#                 break
-#             for step, data in enumerate(self.data_loader, 0):
-#                 cnt += batch_size
-#                 if (cont == False):
-#                     break
-#                 if step % 100 == 0:
-#                     print('cnt: ', cnt)
-#                 # if step > 50:
-#                 #     break
-#
-#                 imgs, captions, cap_lens, class_ids, keys = prepare_data(data)
-#
-#                 hidden = text_encoder.init_hidden(batch_size)
-#                 # words_embs: batch_size x nef x seq_len
-#                 # sent_emb: batch_size x nef
-#                 words_embs, sent_emb = text_encoder(captions, cap_lens, hidden)
-#                 words_embs, sent_emb = words_embs.detach(), sent_emb.detach()
-#                 mask = (captions == 0)
-#                 num_words = words_embs.size(2)
-#                 if mask.size(1) > num_words:
-#                     mask = mask[:, :num_words]
-#
-#                 #######################################################
-#                 # (2) Generate fake images
-#                 ######################################################
-#                 noise.data.normal_(0, 1)
-#                 fake_imgs, _, _, _ = netG(noise, sent_emb, words_embs, mask, cap_lens)
-#                 for j in range(batch_size):
-#                     s_tmp = '%s/single/%s' % (save_dir, keys[j])
-#                     folder = s_tmp[:s_tmp.rfind('/')]
-#                     if not os.path.isdir(folder):
-#                         # print('Make a new folder: ', folder)
-#                         mkdir_p(folder)
-#                     k = -1
-#                     # for k in range(len(fake_imgs)):
-#                     im = fake_imgs[k][j].data.cpu().numpy()
-#                     # [-1, 1] --> [0, 255]
-#                     im = (im + 1.0) * 127.5
-#                     im = im.astype(np.uint8)
-#                     im = np.transpose(im, (1, 2, 0))
-#                     im = Image.fromarray(im)
-#                     fullpath = '%s_s%d_%d.png' % (s_tmp, k, ii)
-#                     im.save(fullpath)
-#
-#                 _, cnn_code = image_encoder(fake_imgs[-1])
-#
-#                 for i in range(batch_size):
-#                     mis_captions, mis_captions_len = self.dataset.get_mis_caption(class_ids[i])
-#                     hidden = text_encoder.init_hidden(99)
-#                     _, sent_emb_t = text_encoder(mis_captions, mis_captions_len, hidden)
-#                     rnn_code = torch.cat((sent_emb[i, :].unsqueeze(0), sent_emb_t), 0)
-#                     ### cnn_code = 1 * nef
-#                     ### rnn_code = 100 * nef
-#                     scores = torch.mm(cnn_code[i].unsqueeze(0), rnn_code.transpose(0, 1))  # 1* 100
-#                     cnn_code_norm = torch.norm(cnn_code[i].unsqueeze(0), 2, dim=1, keepdim=True)
-#                     rnn_code_norm = torch.norm(rnn_code, 2, dim=1, keepdim=True)
-#                     norm = torch.mm(cnn_code_norm, rnn_code_norm.transpose(0, 1))
-#                     scores0 = scores / norm.clamp(min=1e-8)
-#                     if torch.argmax(scores0) == 0:
-#                         R[R_count] = 1
-#                     R_count += 1
-#
-#                 if R_count >= 30000:
-#                     sum = np.zeros(10)
-#                     np.random.shuffle(R)
-#                     for i in range(10):
-#                         sum[i] = np.average(R[i * 3000:(i + 1) * 3000 - 1])
-#                     R_mean = np.average(sum)
-#                     R_std = np.std(sum)
-#                     print("R mean:{:.4f} std:{:.4f}".format(R_mean, R_std))
-#                     cont = False
+    # calculate IS
+    os.chdir(main_wd)
+    inception_score(output_dir+'/'+name)
+    os.chdir(model_wd)
+
+
+
 
 if __name__ == "__main__":
     main_wd = os.getcwd()
