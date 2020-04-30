@@ -4,18 +4,18 @@ GPU_ID: 0
 CUDA: True
 WORKERS: 4
 OUTPUT_PATH: '../'
+RUN: 'AttnGAN'
 
 
 MODELS:
-#    AttnGAN:
-#        WORKING_DIR: '../AttnGAN/code'
-#        CONFIG_PATH: 'cfg/eval_bird.yml'
-#        TEXT_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\text_encoder200.pth'
-#        IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\image_encoder200.pth' # TODO refactor w. replace trick
-#        VERSIONS:
-#            AUTHORS:
-#                RUN: True
-#                G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\AttnGAN\netG_epoch_600.pth'
+    AttnGAN:
+        WORKING_DIR: '../AttnGAN/code'
+        CONFIG_PATH: 'cfg/eval_bird.yml'
+        TEXT_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\text_encoder200.pth'
+        IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\image_encoder200.pth' # TODO refactor w. replace trick
+        VERSIONS:
+            AUTHORS:
+                G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\AttnGAN\netG_epoch_600.pth'
 
 
     DMM_GAN:
@@ -25,10 +25,8 @@ MODELS:
         IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5453\image_encoder200.pth' # TODO refactor w. replace trick
         VERSIONS:
             GLDM_FALSE_STREAM_TRUE:
-                RUN: True
                 G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DMM-GAN\gldm=false_stream=true_bs=8\netG_epoch_600.pth'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_false_stream_true.yml'
             GLDM_TRUE_STREAM_FALSE:
-                RUN: True
                 G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DMM-GAN\gldm=true_stream=false_bs=8\netG_epoch_600.pth'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_true_stream_false.yml'

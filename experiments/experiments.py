@@ -1,9 +1,3 @@
-
-# load dataloader('test')
-# load enkel model + vægte
-# Kør forward pass
-# gem resultat
-
 from __future__ import print_function
 
 import errno
@@ -219,97 +213,90 @@ if __name__ == "__main__":
 
     now = datetime.datetime.now(dateutil.tz.tzlocal())
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
-    output_dir = 'output/%s_%s_%s' % \
-                 (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
-    mkdir_p(output_dir)  # TODO remove from loop
+    output_dir = 'output/%s_%s_%s_%s' % \
+                 (cfg.DATASET_NAME, cfg.CONFIG_NAME, cfg.RUN, timestamp)
+    mkdir_p(output_dir)
 
+    os.chdir(main_wd)
+    model_info = cfg.MODELS[cfg.RUN]
+    model_wd = model_info.WORKING_DIR
+    os.chdir(model_wd)
 
-    for x in cfg.MODELS.keys():
-        os.chdir(main_wd)
-        model_info = cfg.MODELS[x]
-        model_wd = model_info.WORKING_DIR
+    config_py = import_module('miscc.config')
+    cfg_from_file_x = getattr(config_py, 'cfg_from_file')
+    cfg_x = getattr(config_py, 'cfg')
+    cfg_from_file_x(model_info.CONFIG_PATH)
 
-        os.chdir(model_wd)
+    model_py = import_module('model')
+    RNN_ENCODER = getattr(model_py, 'RNN_ENCODER')
+    CNN_ENCODER = getattr(model_py, 'CNN_ENCODER')
+    G_NET = getattr(model_py, 'G_NET')
 
-        config_py = import_module('miscc.config')
-        cfg_from_file_x = getattr(config_py, 'cfg_from_file')
-        cfg_x = getattr(config_py, 'cfg')
-        cfg_from_file_x(model_info.CONFIG_PATH)
+    utils_py = import_module('miscc.utils')
+    weights_init = getattr(utils_py, 'weights_init')
 
-        model_py = import_module('model')
-        RNN_ENCODER = getattr(model_py, 'RNN_ENCODER')
-        CNN_ENCODER = getattr(model_py, 'CNN_ENCODER')
-        G_NET = getattr(model_py, 'G_NET')
+    datasets_py = import_module('datasets')
+    TextDataset = getattr(datasets_py, 'TextDataset')
+    prepare_data = getattr(datasets_py, 'prepare_data')
 
-        utils_py = import_module('miscc.utils')
-        weights_init = getattr(utils_py, 'weights_init')
+    for version in model_info.VERSIONS.keys():
+        version_info = model_info.VERSIONS[version]
 
-        datasets_py = import_module('datasets')
-        TextDataset = getattr(datasets_py, 'TextDataset')
-        prepare_data = getattr(datasets_py, 'prepare_data')
+        manual_seed = 100
+        random.seed(manual_seed)
+        np.random.seed(manual_seed)
+        torch.manual_seed(manual_seed)
+        if cfg.CUDA:
+            torch.cuda.manual_seed_all(manual_seed)
 
-
-
-        for version in model_info.VERSIONS.keys():
-            version_info = model_info.VERSIONS[version]
-
-            manual_seed = 100
-            random.seed(manual_seed)
-            np.random.seed(manual_seed)
-            torch.manual_seed(manual_seed)
-            if cfg.CUDA:
-                torch.cuda.manual_seed_all(manual_seed)
-
-
-
-            # Get data loader
-            split_dir, bshuffle = 'test', True
-            imsize = cfg_x.TREE.BASE_SIZE * (2 ** (cfg_x.TREE.BRANCH_NUM - 1))
-            image_transform = transforms.Compose([
-                transforms.Resize(int(imsize * 76 / 64)),
-                transforms.RandomCrop(imsize),
-                transforms.RandomHorizontalFlip()])
-            dataset = TextDataset(cfg_x.DATA_DIR, split_dir,
-                                  base_size=cfg_x.TREE.BASE_SIZE,
-                                  transform=image_transform)
-            assert dataset
-            dataloader = torch.utils.data.DataLoader(
-                dataset, batch_size=cfg_x.TRAIN.BATCH_SIZE,
-                drop_last=True, shuffle=bshuffle, num_workers=int(cfg.WORKERS))
+        # Get data loader
+        split_dir, bshuffle = 'test', True
+        imsize = cfg_x.TREE.BASE_SIZE * (2 ** (cfg_x.TREE.BRANCH_NUM - 1))
+        image_transform = transforms.Compose([
+            transforms.Resize(int(imsize * 76 / 64)),
+            transforms.RandomCrop(imsize),
+            transforms.RandomHorizontalFlip()])
+        dataset = TextDataset(cfg_x.DATA_DIR, split_dir,
+                              base_size=cfg_x.TREE.BASE_SIZE,
+                              transform=image_transform)
+        assert dataset
+        dataloader = torch.utils.data.DataLoader(
+            dataset, batch_size=cfg_x.TRAIN.BATCH_SIZE,
+            drop_last=True, shuffle=bshuffle, num_workers=int(cfg.WORKERS))
 
 
 
-            # load image encoder
-            # image_encoder = CNN_ENCODER(cfg_x.TEXT.EMBEDDING_DIM)
-            # state_dict = torch.load(model_info.IMAGE_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
-            # image_encoder.load_state_dict(state_dict)
-            # print('Load image encoder from:', model_info.IMAGE_ENCODER_WEIGHTS_PATH)
-            # image_encoder = image_encoder.cuda()
-            # image_encoder.eval()
+        # load image encoder
+        # image_encoder = CNN_ENCODER(cfg_x.TEXT.EMBEDDING_DIM)
+        # state_dict = torch.load(model_info.IMAGE_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
+        # image_encoder.load_state_dict(state_dict)
+        # print('Load image encoder from:', model_info.IMAGE_ENCODER_WEIGHTS_PATH)
+        # image_encoder = image_encoder.cuda()
+        # image_encoder.eval()
 
-            # load generator network
-            if 'CONFIG_PATH' in version_info.keys():
-                cfg_from_file_x(version_info.CONFIG_PATH)
-            netG = G_NET()
-            netG.apply(weights_init)
-            netG.cuda()
-            netG.eval()
-            model_dir = version_info.G_NET_WEIGHTS_PATH
-            state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
-            netG.load_state_dict(state_dict)
-            print('Load G from: ', model_dir)
+        # load generator network
+        if 'CONFIG_PATH' in version_info.keys():
+            cfg_from_file_x(version_info.CONFIG_PATH)
+        netG = G_NET()
+        netG.apply(weights_init)
+        netG.cuda()
+        netG.eval()
+        model_dir = version_info.G_NET_WEIGHTS_PATH
+        state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
+        netG.load_state_dict(state_dict)
+        print('Load G from: ', model_dir)
 
-            # load text encoder
-            text_encoder = RNN_ENCODER(dataset.n_words, nhidden=cfg_x.TEXT.EMBEDDING_DIM)
-            state_dict = torch.load(model_info.TEXT_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
-            text_encoder.load_state_dict(state_dict)
-            print('Load text encoder from:', model_info.TEXT_ENCODER_WEIGHTS_PATH)
-            text_encoder = text_encoder.cuda()
-            text_encoder.eval()
+        # load text encoder
+        text_encoder = RNN_ENCODER(dataset.n_words, nhidden=cfg_x.TEXT.EMBEDDING_DIM)
+        state_dict = torch.load(model_info.TEXT_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
+        text_encoder.load_state_dict(state_dict)
+        print('Load text encoder from:', model_info.TEXT_ENCODER_WEIGHTS_PATH)
+        text_encoder = text_encoder.cuda()
+        text_encoder.eval()
 
-            image_encoder = None
+        image_encoder = None
 
-            start_t = time.time()
-            evaluate(netG, image_encoder, text_encoder, dataloader, output_dir, '{}_{}'.format(x, version))
-            end_t = time.time()
-            print('Total time for training:', end_t - start_t)
+        start_t = time.time()
+        evaluate(netG, image_encoder, text_encoder, dataloader, output_dir, '{}_{}'.format(cfg.RUN, version))
+        end_t = time.time()
+        print('Total time for training:', end_t - start_t)
