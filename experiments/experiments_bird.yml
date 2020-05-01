@@ -6,6 +6,7 @@ WORKERS: 4
 OUTPUT_PATH: '../'
 DATASET_IMGS_PATH: 'C:\Users\Casper\PycharmProjects\DMM-GAN\AttnGAN\data\birds\CUB_200_2011\images'
 MODELS_BASE_PATH: 'E:\MLData\Models\'
+FID_BATCH_SIZE: 8
 RUN: 'DMM-GAN'
 
 
@@ -16,7 +17,7 @@ MODELS:
         TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5450\text_encoder200.pth'
         VERSIONS:
             OUR:
-                G_NET_WEIGHTS_PATH: 'AttnGAN\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'AttnGAN'
 
     DM-GAN:
         WORKING_DIR: '../DM-GAN/code'
@@ -24,7 +25,7 @@ MODELS:
         TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5450\text_encoder200.pth'
         VERSIONS:
             OUR:
-                G_NET_WEIGHTS_PATH: 'DM-GAN\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'DM-GAN'
 
     MirrorGAN:
         WORKING_DIR: '../MirrorGAN'
@@ -32,7 +33,7 @@ MODELS:
         TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5453\text_encoder200.pth'
         VERSIONS:
             OUR:
-                G_NET_WEIGHTS_PATH: 'MirrorGAN\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'MirrorGAN'
 
     DMM-GAN:
         WORKING_DIR: '../DMM-GAN/code'
@@ -40,8 +41,8 @@ MODELS:
         TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5453\text_encoder200.pth'
         VERSIONS:
             GLDM-FALSE_STREAM-TRUE:
-                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=false_stream=true_bs=8\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=false_stream=true_bs=8'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_false_stream_true.yml'
             GLDM-TRUE_STREAM-FALSE:
-                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=true_stream=false_bs=8\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=true_stream=false_bs=8'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_true_stream_false.yml'

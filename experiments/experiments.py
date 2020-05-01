@@ -122,11 +122,13 @@ def evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir,
     # calculate IS
     os.chdir(main_wd)
     fake_imgs_path = output_dir+'/'+name
+    print('Computing IS...')
     mean, std = inception_score(fake_imgs_path)
     print('IS: ', mean, std)
 
     # calculate FID
-    fid = calculate_fid_given_paths([cfg.DATASET_IMGS_PATH, fake_imgs_path], dataloader.batch_size, cfg.CUDA, 2048)
+    print('Computing FID...')
+    fid = calculate_fid_given_paths([cfg.DATASET_IMGS_PATH, fake_imgs_path], cfg.FID_BATCH_SIZE, cfg.CUDA, 2048)
     print('FID: ', fid)
     os.chdir(model_wd)
 
@@ -202,18 +204,6 @@ if __name__ == "__main__":
         image_encoder = image_encoder.cuda()
         image_encoder.eval()
 
-        # load generator network
-        if 'CONFIG_PATH' in version_info.keys():
-            cfg_from_file_x(version_info.CONFIG_PATH)
-        netG = G_NET()
-        netG.apply(weights_init)
-        netG.cuda()
-        netG.eval()
-        model_dir = os.path.join(cfg.MODELS_BASE_PATH, version_info.G_NET_WEIGHTS_PATH)
-        state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
-        netG.load_state_dict(state_dict)
-        print('Load G from: ', model_dir)
-
         # load text encoder
         text_encoder_path = os.path.join(cfg.MODELS_BASE_PATH, model_info.TEXT_ENCODER_WEIGHTS_PATH)
         text_encoder = RNN_ENCODER(dataset.n_words, nhidden=cfg_x.TEXT.EMBEDDING_DIM)
@@ -223,7 +213,25 @@ if __name__ == "__main__":
         text_encoder = text_encoder.cuda()
         text_encoder.eval()
 
-        start_t = time.time()
-        evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir, cfg, version)
-        end_t = time.time()
-        print('Total time for training:', end_t - start_t)
+        # 0, 50, ..., 600
+        for epoch in range(0, 601, 50):
+
+            print('--- {}_{} --- Epoch: {}'.format(cfg.RUN, version, epoch))
+
+            # load generator network
+            if 'CONFIG_PATH' in version_info.keys():
+                cfg_from_file_x(version_info.CONFIG_PATH)
+            netG = G_NET()
+            netG.apply(weights_init)
+            netG.cuda()
+            netG.eval()
+            model_dir = os.path.join(cfg.MODELS_BASE_PATH, version_info.G_NET_WEIGHTS_PATH, 'netG_epoch_{}.pth'.format(epoch))
+            state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
+            netG.load_state_dict(state_dict)
+            print('Load G from: ', model_dir)
+
+            start_t = time.time()
+            evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir, cfg, version)
+            end_t = time.time()
+
+            print('Time for epoch:', end_t - start_t)

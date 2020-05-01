@@ -99,7 +99,7 @@ def get_activations(images, model, batch_size=64, dims=2048, cuda=False, verbose
     #for i in range(n_batches):
     for i, batch in enumerate(images):
         if i % 20 == 0:
-            print('images feature extracted: {}/{}'.format(i*len(batch), len(images)))
+            print('images feature extracted: {}/{}'.format(i*len(batch), len(images)), flush=True)
         #batch = batch[0]
         #if verbose:
             #print('\rPropagating batch %d/%d' % (i + 1, n_batches), end='', flush=True)
@@ -228,16 +228,23 @@ def _compute_statistics_of_path(path, model, batch_size, dims, cuda):
     return m, s
 
 def calculate_fid_given_paths(paths, batch_size, cuda, dims):
+
+    return 10  # TODO remove
+
     """Calculates the FID of two paths"""
     for p in paths:
         if not os.path.exists(p):
             raise RuntimeError('Invalid path: %s' % p)
+
+    print('Loading FID model...')
 
     block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
 
     model = InceptionV3([block_idx])
     if cuda:
         model.cuda()
+
+    print('Computing FID statistics...')
 
     m1, s1 = _compute_statistics_of_path(paths[0], model, batch_size, dims, cuda)
     m2, s2 = _compute_statistics_of_path(paths[1], model, batch_size, dims, cuda)

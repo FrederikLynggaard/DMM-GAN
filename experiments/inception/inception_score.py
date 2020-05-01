@@ -199,6 +199,7 @@ def inception_score(image_folder):
         config.gpu_options.allow_growth = True
         with tf.Session(config=config) as sess:
             with tf.device("/gpu:%d" % FLAGS.gpu):
+
                 # Number of classes in the Dataset label set plus 1.
                 # Label 0 is reserved for an (unused) background class.
                 num_classes = FLAGS.num_classes + 1
