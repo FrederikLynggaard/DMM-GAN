@@ -122,13 +122,13 @@ def evaluate(netG, image_encoder, text_encoder, dataset, dataloader, output_dir,
     # calculate IS
     os.chdir(main_wd)
     fake_imgs_path = output_dir+'/'+name
-    inception_score(fake_imgs_path)
+    mean, std = inception_score(fake_imgs_path)
+    print('IS: ', mean, std)
 
     # calculate FID
     fid = calculate_fid_given_paths([cfg.DATASET_IMGS_PATH, fake_imgs_path], dataloader.batch_size, cfg.CUDA, 2048)
     print('FID: ', fid)
     os.chdir(model_wd)
-
 
 
 if __name__ == "__main__":
@@ -194,10 +194,11 @@ if __name__ == "__main__":
 
 
         # load image encoder
+        image_encoder_path = os.path.join(cfg.MODELS_BASE_PATH, model_info.TEXT_ENCODER_WEIGHTS_PATH).replace('text_encoder', 'image_encoder')
         image_encoder = CNN_ENCODER(cfg_x.TEXT.EMBEDDING_DIM)
-        #state_dict = torch.load(model_info.IMAGE_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
+        #state_dict = torch.load(image_encoder_path, map_location=lambda storage, loc: storage)
         #image_encoder.load_state_dict(state_dict)
-        print('Load image encoder from:', model_info.IMAGE_ENCODER_WEIGHTS_PATH)
+        print('Load image encoder from:', image_encoder_path)
         image_encoder = image_encoder.cuda()
         image_encoder.eval()
 
@@ -208,16 +209,17 @@ if __name__ == "__main__":
         netG.apply(weights_init)
         netG.cuda()
         netG.eval()
-        model_dir = version_info.G_NET_WEIGHTS_PATH
+        model_dir = os.path.join(cfg.MODELS_BASE_PATH, version_info.G_NET_WEIGHTS_PATH)
         state_dict = torch.load(model_dir, map_location=lambda storage, loc: storage)
         netG.load_state_dict(state_dict)
         print('Load G from: ', model_dir)
 
         # load text encoder
+        text_encoder_path = os.path.join(cfg.MODELS_BASE_PATH, model_info.TEXT_ENCODER_WEIGHTS_PATH)
         text_encoder = RNN_ENCODER(dataset.n_words, nhidden=cfg_x.TEXT.EMBEDDING_DIM)
-        state_dict = torch.load(model_info.TEXT_ENCODER_WEIGHTS_PATH, map_location=lambda storage, loc: storage)
+        state_dict = torch.load(text_encoder_path, map_location=lambda storage, loc: storage)
         text_encoder.load_state_dict(state_dict)
-        print('Load text encoder from:', model_info.TEXT_ENCODER_WEIGHTS_PATH)
+        print('Load text encoder from:', text_encoder_path)
         text_encoder = text_encoder.cuda()
         text_encoder.eval()
 

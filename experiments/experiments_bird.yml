@@ -4,7 +4,8 @@ GPU_ID: 0
 CUDA: True
 WORKERS: 4
 OUTPUT_PATH: '../'
-DATASET_IMGS_PATH: 'C:\Users\45207\PycharmProjects\DMM-GAN\AttnGAN\data\birds\CUB_200_2011\images'
+DATASET_IMGS_PATH: 'C:\Users\Casper\PycharmProjects\DMM-GAN\AttnGAN\data\birds\CUB_200_2011\images'
+MODELS_BASE_PATH: 'E:\MLData\Models\'
 RUN: 'DMM-GAN'
 
 
@@ -12,39 +13,35 @@ MODELS:
     AttnGAN:
         WORKING_DIR: '../AttnGAN/code'
         CONFIG_PATH: 'cfg/eval_bird.yml'
-        TEXT_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\text_encoder200.pth'
-        IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\image_encoder200.pth' # TODO refactor w. replace trick
+        TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5450\text_encoder200.pth'
         VERSIONS:
             OUR:
-                G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\AttnGAN\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'AttnGAN\netG_epoch_600.pth'
 
     DM-GAN:
         WORKING_DIR: '../DM-GAN/code'
         CONFIG_PATH: 'cfg/eval_bird.yml'
-        TEXT_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\text_encoder200.pth'
-        IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5450\image_encoder200.pth' # TODO refactor w. replace trick
+        TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5450\text_encoder200.pth'
         VERSIONS:
             OUR:
-                G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DM-GAN\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'DM-GAN\netG_epoch_600.pth'
 
     MirrorGAN:
         WORKING_DIR: '../MirrorGAN'
         CONFIG_PATH: 'cfg/eval_bird.yml'
-        TEXT_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5453\text_encoder200.pth'
-        IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5453\image_encoder200.pth' # TODO refactor w. replace trick
+        TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5453\text_encoder200.pth'
         VERSIONS:
             OUR:
-                G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\MirrorGAN\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'MirrorGAN\netG_epoch_600.pth'
 
     DMM-GAN:
         WORKING_DIR: '../DMM-GAN/code'
         CONFIG_PATH: 'cfg/eval_bird.yml'
-        TEXT_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5453\text_encoder200.pth'
-        IMAGE_ENCODER_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DAMSM\vocab_5453\image_encoder200.pth' # TODO refactor w. replace trick
+        TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5453\text_encoder200.pth'
         VERSIONS:
             GLDM-FALSE_STREAM-TRUE:
-                G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DMM-GAN\gldm=false_stream=true_bs=8\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=false_stream=true_bs=8\netG_epoch_600.pth'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_false_stream_true.yml'
             GLDM-TRUE_STREAM-FALSE:
-                G_NET_WEIGHTS_PATH: 'C:\Users\45207\Documents\Speciale\Models\DMM-GAN\gldm=true_stream=false_bs=8\netG_epoch_600.pth'
+                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=true_stream=false_bs=8\netG_epoch_600.pth'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_true_stream_false.yml'

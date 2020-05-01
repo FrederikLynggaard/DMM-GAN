@@ -12,7 +12,7 @@ TRAIN:
     FLAG: False
     NET_G: '../models/bird_DMM-GAN.pth'   # path to the trained model
     B_NET_D: False
-    BATCH_SIZE: 10
+    BATCH_SIZE: 6
     NET_E: '../DAMSMencoders/text_encoder600.pth'
 
 GAN:

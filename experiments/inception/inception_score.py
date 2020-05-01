@@ -38,7 +38,6 @@ if sys.version_info[0] == 2:
 else:
     import pickle
 
-
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('checkpoint_dir',
@@ -193,6 +192,7 @@ def inference(images, num_classes, for_training=False, restore_logits=True,
 
 
 def inception_score(image_folder):
+
     """Evaluate model on Dataset for a number of steps."""
     with tf.Graph().as_default():
         config = tf.ConfigProto(allow_soft_placement=True)
@@ -227,4 +227,4 @@ def inception_score(image_folder):
                 saver.restore(sess, FLAGS.checkpoint_dir)
                 print('Restore the model from %s).' % FLAGS.checkpoint_dir)
                 images = load_data(image_folder)
-                get_inception_score(sess, images, pred_op)
+                return get_inception_score(sess, images, pred_op)
