@@ -99,7 +99,7 @@ def get_activations(images, model, batch_size=64, dims=2048, cuda=False, verbose
     #for i in range(n_batches):
     for i, batch in enumerate(images):
         if i % 20 == 0:
-            print('images feature extracted: {}/{}'.format(i*len(batch), len(images)), flush=True)
+            print('images feature extracted: {}/{}'.format(i*len(batch), d0), flush=True)
         #batch = batch[0]
         #if verbose:
             #print('\rPropagating batch %d/%d' % (i + 1, n_batches), end='', flush=True)
@@ -211,7 +211,7 @@ def calculate_activation_statistics(images, model, batch_size=64,
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
 
-def _compute_statistics_of_path(path, model, batch_size, dims, cuda):
+def compute_statistics_of_path(path, model, batch_size, dims, cuda):
     if path.endswith('.npz'):
         f = np.load(path)
         m, s = f['mu'][:], f['sigma'][:]
@@ -229,8 +229,6 @@ def _compute_statistics_of_path(path, model, batch_size, dims, cuda):
 
 def calculate_fid_given_paths(paths, batch_size, cuda, dims):
 
-    return 10  # TODO remove
-
     """Calculates the FID of two paths"""
     for p in paths:
         if not os.path.exists(p):
@@ -246,8 +244,8 @@ def calculate_fid_given_paths(paths, batch_size, cuda, dims):
 
     print('Computing FID statistics...')
 
-    m1, s1 = _compute_statistics_of_path(paths[0], model, batch_size, dims, cuda)
-    m2, s2 = _compute_statistics_of_path(paths[1], model, batch_size, dims, cuda)
+    m1, s1 = compute_statistics_of_path(paths[0], model, batch_size, dims, cuda)
+    m2, s2 = compute_statistics_of_path(paths[1], model, batch_size, dims, cuda)
     fid_value = calculate_frechet_distance(m1, s1, m2, s2)
     return fid_value
 

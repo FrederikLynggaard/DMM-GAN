@@ -3,7 +3,7 @@ DATASET_NAME: 'birds'
 GPU_ID: 0
 CUDA: True
 WORKERS: 4
-OUTPUT_PATH: '../'
+OUTPUT_PATH: 'output'
 DATASET_IMGS_PATH: 'C:\Users\Casper\PycharmProjects\DMM-GAN\AttnGAN\data\birds\CUB_200_2011\images'
 MODELS_BASE_PATH: 'E:\MLData\Models\'
 FID_BATCH_SIZE: 8
