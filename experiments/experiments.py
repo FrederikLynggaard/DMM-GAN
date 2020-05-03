@@ -67,7 +67,7 @@ def sampling_and_r_precision():
             #######################################################
             # (2) Generate fake images
             ######################################################
-            nz = 100 # TODO refactor
+            nz = cfg_x.GAN.Z_DIM
             noise = Variable(torch.FloatTensor(dataloader.batch_size, nz), volatile=True)
             noise = noise.cuda()
             noise.data.normal_(0, 1)
@@ -109,7 +109,7 @@ def sampling_and_r_precision():
                     R[R_count] = 1
                 R_count += 1
 
-            if R_count >= 100:
+            if R_count >= 30000:
                 sum = np.zeros(10)
                 np.random.shuffle(R)
                 for i in range(10):
@@ -178,7 +178,7 @@ if __name__ == "__main__":
 
     model_py = import_module('model')
     RNN_ENCODER = getattr(model_py, 'RNN_ENCODER')
-    CNN_ENCODER = getattr(model_py, 'CNN_ENCODER_MOCK')
+    CNN_ENCODER = getattr(model_py, 'CNN_ENCODER')
     G_NET = getattr(model_py, 'G_NET')
 
     utils_py = import_module('miscc.utils')
@@ -207,9 +207,9 @@ if __name__ == "__main__":
     image_encoder_path = os.path.join(cfg.MODELS_BASE_PATH, model_info.TEXT_ENCODER_WEIGHTS_PATH).replace(
         'text_encoder', 'image_encoder')
     image_encoder = CNN_ENCODER(cfg_x.TEXT.EMBEDDING_DIM)
+    print('Load image encoder from:', image_encoder_path)
     state_dict = torch.load(image_encoder_path, map_location=lambda storage, loc: storage)
     image_encoder.load_state_dict(state_dict)
-    print('Load image encoder from:', image_encoder_path)
     image_encoder = image_encoder.cuda()
     image_encoder.eval()
 
@@ -238,7 +238,7 @@ if __name__ == "__main__":
             torch.cuda.manual_seed_all(manual_seed)
 
         # 0, 50, ..., 600
-        for epoch in range(0, 101, 50):
+        for epoch in range(0, 601, 50):
 
             results[name][epoch] = {}
 
@@ -283,7 +283,7 @@ if __name__ == "__main__":
             torch.cuda.manual_seed_all(manual_seed)
 
         # 0, 50, ..., 600
-        for epoch in range(0, 101, 50):
+        for epoch in range(0, 601, 50):
 
             start_t = time.time()
             print('--- IS --- {}_{} --- Epoch: {}'.format(cfg.RUN, version, epoch))

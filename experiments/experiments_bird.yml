@@ -40,9 +40,15 @@ MODELS:
         CONFIG_PATH: 'cfg/eval_bird.yml'
         TEXT_ENCODER_WEIGHTS_PATH: 'DAMSM\vocab_5453\text_encoder200.pth'
         VERSIONS:
+            GLDM-FALSE_STREAM-FALSE:
+                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=false_stream=false_bs=10'
+                CONFIG_PATH: 'cfg/DMM_GAN_gldm_false_stream_false.yml'
             GLDM-FALSE_STREAM-TRUE:
                 G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=false_stream=true_bs=8'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_false_stream_true.yml'
             GLDM-TRUE_STREAM-FALSE:
                 G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=true_stream=false_bs=8'
                 CONFIG_PATH: 'cfg/DMM_GAN_gldm_true_stream_false.yml'
+            GLDM-TRUE_STREAM-TRUE:
+                G_NET_WEIGHTS_PATH: 'DMM-GAN\gldm=true_stream=true_bs=6'
+                CONFIG_PATH: 'cfg/DMM_GAN_gldm_true_stream_true.yml'
