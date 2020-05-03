@@ -116,6 +116,7 @@ def sampling_and_r_precision():
                     sum[i] = np.average(R[i * 3000:(i + 1) * 3000 - 1])
                 R_mean = np.average(sum)
                 R_std = np.std(sum)
+                results[name][epoch]['R'] = {'mean': '{:.5f}'.format(R_mean), 'std': '{:.5f}'.format(R_std)}
                 print("R mean:{:.4f} std:{:.4f}".format(R_mean, R_std))
                 cont = False
                 break
@@ -126,6 +127,7 @@ def compute_is():
     fake_imgs_path = os.path.join(output_dir, name, 'images', 'epoch_{}'.format(epoch))
 
     mean, std = inception_score(fake_imgs_path)
+    results[name][epoch]['IS'] = {'mean': '{:.5f}'.format(mean), 'std': '{:.5f}'.format(std)}
     print('IS: ', mean, std)
 
 
@@ -144,7 +146,7 @@ def compute_fid():
 
     m2, s2 = compute_statistics_of_path(fake_imgs_path, fid_model, cfg.FID_BATCH_SIZE, dims, cfg.CUDA)
     fid = calculate_frechet_distance(m1, s1, m2, s2)
-
+    results[name][epoch]['FID'] = '{:.5f}'.format(fid)
     print('FID: ', fid)
 
 
@@ -205,8 +207,8 @@ if __name__ == "__main__":
     image_encoder_path = os.path.join(cfg.MODELS_BASE_PATH, model_info.TEXT_ENCODER_WEIGHTS_PATH).replace(
         'text_encoder', 'image_encoder')
     image_encoder = CNN_ENCODER(cfg_x.TEXT.EMBEDDING_DIM)
-    # state_dict = torch.load(image_encoder_path, map_location=lambda storage, loc: storage)
-    # image_encoder.load_state_dict(state_dict)
+    state_dict = torch.load(image_encoder_path, map_location=lambda storage, loc: storage)
+    image_encoder.load_state_dict(state_dict)
     print('Load image encoder from:', image_encoder_path)
     image_encoder = image_encoder.cuda()
     image_encoder.eval()
@@ -220,9 +222,13 @@ if __name__ == "__main__":
     text_encoder = text_encoder.cuda()
     text_encoder.eval()
 
+    results = {}
+
     for version in model_info.VERSIONS.keys():
         version_info = model_info.VERSIONS[version]
         name = '{}_{}'.format(cfg.RUN, version)
+
+        results[name] = {}
 
         manual_seed = 100
         random.seed(manual_seed)
@@ -232,7 +238,9 @@ if __name__ == "__main__":
             torch.cuda.manual_seed_all(manual_seed)
 
         # 0, 50, ..., 600
-        for epoch in range(0, 101, 200):
+        for epoch in range(0, 101, 50):
+
+            results[name][epoch] = {}
 
             print('--- Sampling and R-Precision --- {}_{} --- Epoch: {}'.format(cfg.RUN, version, epoch))
 
@@ -275,7 +283,7 @@ if __name__ == "__main__":
             torch.cuda.manual_seed_all(manual_seed)
 
         # 0, 50, ..., 600
-        for epoch in range(0, 101, 200):
+        for epoch in range(0, 101, 50):
 
             start_t = time.time()
             print('--- IS --- {}_{} --- Epoch: {}'.format(cfg.RUN, version, epoch))
@@ -285,3 +293,8 @@ if __name__ == "__main__":
             end_t = time.time()
 
             print('Time for epoch:', end_t - start_t)
+
+        pprint.pprint(results)
+        results_path = os.path.join(output_dir, name, name + '_scores.json')
+        with open(results_path, 'w') as outfile:
+            json.dump(results[name], outfile)
