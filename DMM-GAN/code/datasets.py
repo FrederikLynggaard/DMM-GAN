@@ -233,6 +233,14 @@ class TextDataset(data.Dataset):
             with open(filepath, 'rb') as f:
                 x = pickle.load(f)
                 train_captions, test_captions = x[0], x[1]
+
+                new_test_captions = []
+                for cap in test_captions:
+                    new_cap = [0] + cap + [1]
+                    new_test_captions.append(new_cap)
+
+                test_captions = new_test_captions
+
                 ixtoword, wordtoix = x[2], x[3]
                 del x
                 n_words = len(ixtoword)
