@@ -88,8 +88,8 @@ if __name__ == "__main__":
             else:
                 print("Invalid answer!")
 
+        plt.close('all')
         if step == 99:
-            plt.close('all')
 
             json = json.dumps(result)
             f = open("result.json", "w")
