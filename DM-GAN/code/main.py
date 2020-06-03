@@ -40,14 +40,14 @@ def gen_example(wordtoix, algo):
     filepath = '%s/example_filenames.txt' % (cfg.DATA_DIR)
     data_dic = {}
     with open(filepath, "r") as f:
-        filenames = f.read().decode('utf8').split('\n')
+        filenames = f.read().split('\n')
         for name in filenames:
             if len(name) == 0:
                 continue
             filepath = '%s/%s.txt' % (cfg.DATA_DIR, name)
             with open(filepath, "r") as f:
                 print('Load from:', name)
-                sentences = f.read().decode('utf8').split('\n')
+                sentences = f.read().split('\n')
                 # a list of indices for a sentence
                 captions = []
                 cap_lens = []
@@ -81,6 +81,12 @@ def gen_example(wordtoix, algo):
                 cap_array[i, :c_len] = cap
             key = name[(name.rfind('/') + 1):]
             data_dic[key] = [cap_array, cap_lens, sorted_indices]
+
+    elem = data_dic[key]
+    del data_dic[key]
+    for i in range(20):
+        data_dic[i] = elem
+
     algo.gen_example(data_dic)
 
 
