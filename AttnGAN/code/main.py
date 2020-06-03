@@ -80,6 +80,12 @@ def gen_example(wordtoix, algo):
                 cap_array[i, :c_len] = cap
             key = name[(name.rfind('/') + 1):]
             data_dic[key] = [cap_array, cap_lens, sorted_indices]
+
+    elem = data_dic[key]
+    del data_dic[key]
+    for i in range(20):
+        data_dic[i] = elem
+
     algo.gen_example(data_dic)
 
 

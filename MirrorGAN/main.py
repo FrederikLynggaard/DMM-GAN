@@ -39,14 +39,14 @@ def gen_example(wordtoix, algo):
     filepath = '%s/example_filenames.txt' % (cfg.DATA_DIR)
     data_dic = {}
     with open(filepath, "r") as f:
-        filenames = f.read().decode('utf8').split('\n')
+        filenames = f.read().split('\n')
         for name in filenames:
             if len(name) == 0:
                 continue
             filepath = '%s/%s.txt' % (cfg.DATA_DIR, name)
             with open(filepath, "r") as f:
                 print('Load from:', name)
-                sentences = f.read().decode('utf8').split('\n')
+                sentences = f.read().split('\n')
                 # a list of indices for a sentence
                 captions = []
                 cap_lens = []
@@ -61,10 +61,12 @@ def gen_example(wordtoix, algo):
                         continue
 
                     rev = []
+                    rev.append(wordtoix['<start>'])
                     for t in tokens:
                         t = t.encode('ascii', 'ignore').decode('ascii')
                         if len(t) > 0 and t in wordtoix:
                             rev.append(wordtoix[t])
+                    rev.append(wordtoix['<end>'])
                     captions.append(rev)
                     cap_lens.append(len(rev))
             max_len = np.max(cap_lens)
@@ -72,7 +74,7 @@ def gen_example(wordtoix, algo):
             sorted_indices = np.argsort(cap_lens)[::-1]
             cap_lens = np.asarray(cap_lens)
             cap_lens = cap_lens[sorted_indices]
-            cap_array = np.zeros((len(captions), max_len), dtype='int64')
+            cap_array = np.ones((len(captions), max_len), dtype='int64')*2
             for i in range(len(captions)):
                 idx = sorted_indices[i]
                 cap = captions[idx]
@@ -80,6 +82,12 @@ def gen_example(wordtoix, algo):
                 cap_array[i, :c_len] = cap
             key = name[(name.rfind('/') + 1):]
             data_dic[key] = [cap_array, cap_lens, sorted_indices]
+
+    elem = data_dic[key]
+    del data_dic[key]
+    for i in range(20):
+        data_dic[i] = elem
+
     algo.gen_example(data_dic)
 
 
