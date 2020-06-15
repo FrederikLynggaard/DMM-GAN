@@ -9,7 +9,7 @@ An overview of the AttnGAN architecture. This architecture is fundamental for DM
 
 ## Figure 2  (DMM-GAN)
 <img src="DMM-GAN.png" width="900px"/>
-An overview of our DMM-GAN architecture in relation to AttnGAN. This figure illustrates DMM-GAN's additions/changes (green) and removed parts (red). For this method, the DAMSM loss is replaced by the Semantic Text REgeneration and Alignment Module (STREAM), which is used to produce a caption redescription loss. The DAMSM image encoder is therefore removed, since STREAM contains its own image encoder. Furthermore, attention mechanisms are replaced by global-local dynamic memory mechanisms (GLDM), and as a result, hidden image features are no longer passed directly to next stages. The joining operation is therefore not needed. <br />
+An overview of our DMM-GAN architecture in relation to AttnGAN. This figure illustrates DMM-GAN's additions/changes (green) and removed parts (red). For this method, the DAMSM loss is replaced by the Semantic Text REgeneration and Alignment Module (STREAM), which is used to produce a caption redescription loss. The DAMSM image encoder is therefore removed, since STREAM contains its own image encoder. Furthermore, attention mechanisms are replaced by global-local dynamic memory mechanisms (GLDM), and as a result, hidden image features are no longer passed directly to next stages. The joining operation is therefore not needed. <br /><br />
 
 
 The details of STREAM and GLDM are shown in the following illustrations.
